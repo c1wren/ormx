@@ -7,13 +7,38 @@ use syn::spanned::Spanned;
 use syn::token::Token;
 use syn::*;
 
-fn duplicate<T>(_: T) -> Result<()> {
-    Err(Error::new(Span::call_site(), "duplicate attribute"))
+pub(crate) type Accessor = Option<Ident>;
+
+pub(crate) enum HelperAttr {
+    Generated,
+    TableName(String),
+    Rename(String),
+    GetOne(Accessor),
+    GetOptional(Accessor),
+    GetMany(Accessor),
+    Set(Accessor),
+    PrimaryKey,
 }
 
-fn concat_ident(prefix: &str, ident: &Ident) -> Ident {
-    Ident::new(&format!("{}_{}", prefix, ident), Span::call_site())
+impl fmt::Display for HelperAttr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            HelperAttr::Generated => write!(f, "#[generated]"),
+            HelperAttr::TableName(table) => write!(f, "#[table = {:?}]", table),
+            HelperAttr::Rename(rename) => write!(f, "rename = {:?}", rename),
+            HelperAttr::GetOne(None) => write!(f, "get_one"),
+            HelperAttr::GetOne(Some(func)) => write!(f, "get_one = {}", func),
+            HelperAttr::GetOptional(None) => write!(f, "get_optional"),
+            HelperAttr::GetOptional(Some(func)) => write!(f, "get_optional = {}", func),
+            HelperAttr::GetMany(None) => write!(f, "get_many"),
+            HelperAttr::GetMany(Some(func)) => write!(f, "get_many = {}", func),
+            HelperAttr::Set(None) => write!(f, "set"),
+            HelperAttr::Set(Some(func)) => write!(f, "set = {}", func),
+            HelperAttr::PrimaryKey => write!(f, "primary_key"),
+        }
+    }
 }
+
 
 impl TryFrom<&Field> for EntityField {
     type Error = Error;
@@ -40,15 +65,15 @@ impl TryFrom<&Field> for EntityField {
                 HelperAttr::PrimaryKey => result.primary_key = true,
                 HelperAttr::Rename(r) => result.db_ident = r,
                 HelperAttr::GetOne(g) => {
-                    let fn_name = g.unwrap_or_else(|| get_ident("get"));
+                    let fn_name = g.unwrap_or_else(|| get_ident("get_by"));
                     result.get_one = Some(fn_name)
                 }
                 HelperAttr::GetOptional(g) => {
-                    let fn_name = g.unwrap_or_else(|| get_ident("get"));
+                    let fn_name = g.unwrap_or_else(|| get_ident("get_by"));
                     result.get_optional = Some(fn_name);
                 }
                 HelperAttr::GetMany(g) => {
-                    let fn_name = g.unwrap_or_else(|| get_ident("get"));
+                    let fn_name = g.unwrap_or_else(|| get_ident("get_by"));
                     result.get_many = Some(fn_name);
                 }
                 HelperAttr::Set(s) => {
@@ -180,4 +205,12 @@ fn parse_optional_assign<V: Parse>(input: &ParseStream) -> Result<Option<V>> {
     } else {
         None
     })
+}
+
+fn duplicate<T>(_: T) -> Result<()> {
+    Err(Error::new(Span::call_site(), "duplicate attribute"))
+}
+
+fn concat_ident(prefix: &str, ident: &Ident) -> Ident {
+    Ident::new(&format!("{}_{}", prefix, ident), Span::call_site())
 }
