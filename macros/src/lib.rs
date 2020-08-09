@@ -3,11 +3,14 @@ extern crate proc_macro;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
 use std::convert::TryFrom;
+use std::fmt;
+use syn::export::Formatter;
 use syn::*;
 
 mod get;
 mod parse;
-// mod set;
+mod insert;
+mod set;
 
 fn connection_type() -> TokenStream2 {
     #[cfg(feature = "sqlite")]
@@ -29,13 +32,36 @@ pub(crate) enum HelperAttr {
     GetOptional(Accessor),
     GetMany(Accessor),
     Set(Accessor),
+    PrimaryKey,
 }
 
+impl fmt::Display for HelperAttr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            HelperAttr::Generated => write!(f, "#[generated]"),
+            HelperAttr::TableName(table) => write!(f, "#[table = {:?}]", table),
+            HelperAttr::Rename(rename) => write!(f, "rename = {:?}", rename),
+            HelperAttr::GetOne(None) => write!(f, "get_one"),
+            HelperAttr::GetOne(Some(func)) => write!(f, "get_one = {}", func),
+            HelperAttr::GetOptional(None) => write!(f, "get_optional"),
+            HelperAttr::GetOptional(Some(func)) => write!(f, "get_optional = {}", func),
+            HelperAttr::GetMany(None) => write!(f, "get_many"),
+            HelperAttr::GetMany(Some(func)) => write!(f, "get_many = {}", func),
+            HelperAttr::Set(None) => write!(f, "set"),
+            HelperAttr::Set(Some(func)) => write!(f, "set = {}", func),
+            HelperAttr::PrimaryKey => write!(f, "primary_key"),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub(crate) struct EntityField {
-    get_one: Option<Accessor>,
-    get_optional: Option<Accessor>,
-    get_many: Option<Accessor>,
-    set: Option<Accessor>,
+    get_one: Option<Ident>,
+    get_optional: Option<Ident>,
+    get_many: Option<Ident>,
+    set: Option<Ident>,
+    generated: bool,
+    primary_key: bool,
 
     db_ident: String,
     rust_ident: Ident,
@@ -46,24 +72,71 @@ pub(crate) struct Entity {
     table_name: String,
     ident: Ident,
     fields: Vec<EntityField>,
+    primary_key: Option<EntityField>,
+}
+
+impl Entity {
+    pub(crate) fn generate_getters(&self) -> TokenStream2 {
+        self.fields
+            .iter()
+            .flat_map(|field| {
+                std::iter::empty()
+                    .chain(
+                        field
+                            .get_one
+                            .as_ref()
+                            .map(|func| get::single(self, field, func)),
+                    )
+                    .chain(
+                        field
+                            .get_optional
+                            .as_ref()
+                            .map(|func| get::optional(self, field, func)),
+                    )
+                    .chain(
+                        field
+                            .get_many
+                            .as_ref()
+                            .map(|func| get::many(self, field, func)),
+                    )
+            })
+            .collect()
+    }
+
+    fn generate_setters(&self) -> Result<TokenStream2> {
+        self.fields
+            .iter()
+            .flat_map(|field| field.set.as_ref().map(|func| set::set(self, field, func)))
+            .collect()
+    }
+
+    fn gen_insert(&self) -> TokenStream2 {
+        let fields = self.fields.iter()
+            .map(|EntityField { rust_ident, ty, .. }| quote!(#rust_ident));
+
+        quote! {
+            pub async fn insert(
+                con: &mut #connection,
+                #(#field_idents: #field_types),*
+            ) -> sqlx::Result<Self> {
+
+            }
+        }
+    }
 }
 
 fn derive_entity(input: DeriveInput) -> Result<TokenStream2> {
-    let entity = Entity::try_from(input)?;
-    /*
-    let ty = input.ident.clone();
-    let entity = Entity::try_from(input)?;
-    let getters = entity
-        .fields
-        .iter()
-        .map(|field| get::generate(&entity, field))
-        .collect::<Vec<_>>();
+    let ty = &input.ident;
+    let entity = Entity::try_from(&input)?;
+    let getters = entity.generate_getters();
+    let setters = entity.generate_setters()?;
+
     Ok(quote! {
         impl #ty {
-            #(#getters)*
+            #getters
+            #setters
         }
-    })*/
-    unimplemented!()
+    })
 }
 
 #[proc_macro_derive(Entity, attributes(table, get_by, set, rename, ormx))]
@@ -76,9 +149,9 @@ pub fn derive_entity_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
     .into()
 }
 
-fn function_name(prefix: &str, field_ident: &Ident, accessor: &Accessor) -> Ident {
-    match accessor {
-        None => Ident::new(&format!("{}_{}", prefix, field_ident), Span::call_site()),
+fn function_name(prefix: &str, field: &Ident, rename: &Option<Ident>) -> Ident {
+    match rename {
+        None => Ident::new(&format!("{}_{}", prefix, field), Span::call_site()),
         Some(accessor) => accessor.clone(),
     }
 }

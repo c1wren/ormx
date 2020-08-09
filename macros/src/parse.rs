@@ -11,55 +11,62 @@ fn duplicate<T>(_: T) -> Result<()> {
     Err(Error::new(Span::call_site(), "duplicate attribute"))
 }
 
-impl TryFrom<Field> for EntityField {
+fn concat_ident(prefix: &str, ident: &Ident) -> Ident {
+    Ident::new(&format!("{}_{}", prefix, ident), Span::call_site())
+}
+
+impl TryFrom<&Field> for EntityField {
     type Error = Error;
 
-    fn try_from(field: Field) -> Result<Self> {
-        let mut generated = false;
-        let mut rename = None;
-        let mut get_one = None;
-        let mut get_opt = None;
-        let mut get_many = None;
-        let mut set = None;
-        for attr in HelperAttr::parse_all(&field.attrs)? {
-            match attr {
-                HelperAttr::Generated => generated = true,
-                HelperAttr::Rename(r) => {
-                    rename.replace(r).map_or(Ok(()), duplicate)?;
-                }
-                HelperAttr::GetOne(g) => {
-                    get_one.replace(g).map_or(Ok(()), duplicate)?;
-                }
-                HelperAttr::GetOptional(g) => {
-                    get_opt.replace(g).map_or(Ok(()), duplicate)?;
-                }
-                HelperAttr::GetMany(g) => {
-                    get_many.replace(g).map_or(Ok(()), duplicate)?;
-                }
-                HelperAttr::Set(s) => {
-                    set.replace(s).map_or(Ok(()), duplicate)?;
-                }
-                _ => return Err(Error::new(Span::call_site(), "unexpected attribute")),
-            }
-        }
+    fn try_from(field: &Field) -> Result<Self> {
+        let ident = field.ident.clone().unwrap();
+        let get_ident =
+            |prefix: &str| Ident::new(&format!("{}_{}", prefix, ident), Span::call_site());
 
-        let rust_ident = field.ident.unwrap();
-        Ok(EntityField {
+        let mut result = EntityField {
             get_one: None,
             get_optional: None,
             get_many: None,
             set: None,
-            ty: field.ty,
-            db_ident: rename.unwrap_or_else(|| rust_ident.to_string()),
-            rust_ident,
-        })
+            ty: field.ty.clone(),
+            db_ident: ident.to_string(),
+            rust_ident: ident.clone(),
+            generated: false,
+            primary_key: false
+        };
+        for attr in HelperAttr::parse_all(&field.attrs)? {
+            match attr {
+                HelperAttr::Generated => result.generated = true,
+                HelperAttr::PrimaryKey => result.primary_key = true,
+                HelperAttr::Rename(r) => result.db_ident = r,
+                HelperAttr::GetOne(g) => {
+                    let fn_name = g.unwrap_or_else(|| get_ident("get"));
+                    result.get_one = Some(fn_name)
+                }
+                HelperAttr::GetOptional(g) => {
+                    let fn_name = g.unwrap_or_else(|| get_ident("get"));
+                    result.get_optional = Some(fn_name);
+                }
+                HelperAttr::GetMany(g) => {
+                    let fn_name = g.unwrap_or_else(|| get_ident("get"));
+                    result.get_many = Some(fn_name);
+                }
+                HelperAttr::Set(s) => {
+                    let fn_name = s.unwrap_or_else(|| get_ident("set"));
+                    result.set = Some(fn_name);
+                }
+                x => return Err(Error::new(Span::call_site(), format!("unexpected attribute {}", x))),
+            }
+        }
+
+        Ok(result)
     }
 }
 
-impl TryFrom<DeriveInput> for Entity {
+impl TryFrom<&DeriveInput> for Entity {
     type Error = Error;
 
-    fn try_from(input: DeriveInput) -> Result<Self> {
+    fn try_from(input: &DeriveInput) -> Result<Self> {
         let ident = input.ident.clone();
         let data_struct = match &input.data {
             Data::Struct(s) => s,
@@ -71,8 +78,9 @@ impl TryFrom<DeriveInput> for Entity {
             }
         };
 
-        let fields = get_fields(input.span(), &data_struct)?
-            .cloned()
+        let fields = get_fields(input.span(), &data_struct)?;
+        let fields = fields
+            .into_iter()
             .map(EntityField::try_from)
             .collect::<Result<Vec<_>>>()?;
 
@@ -88,20 +96,29 @@ impl TryFrom<DeriveInput> for Entity {
         let table_name = table_name
             .ok_or_else(|| Error::new(Span::call_site(), r#"missing #[table = ".."] attribute"#))?;
 
+        let mut primary_key: Option<EntityField> = None;
+        for field in fields.iter() {
+            if field.primary_key {
+                if primary_key.is_some() {
+                    return Err(Error::new(Span::call_site(), "duplicate primary key"))
+                }
+                primary_key = Some(field.clone());
+            }
+        }
+
         Ok(Entity {
             table_name,
             fields,
             ident,
+            primary_key,
         })
     }
 }
 
-fn get_fields<'a>(
-    span: Span,
-    input: &'a DataStruct,
-) -> Result<impl Iterator<Item = &'a Field> + 'a> {
+
+fn get_fields(span: Span, input: &DataStruct) -> Result<Vec<&Field>> {
     match &input.fields {
-        Fields::Named(FieldsNamed { named, .. }) => Ok(named.iter()),
+        Fields::Named(FieldsNamed { named, .. }) => Ok(named.iter().collect()),
         _ => {
             return Err(Error::new(
                 span,
@@ -123,6 +140,7 @@ impl HelperAttr {
             .into_iter()
             .flatten()
             .collect();
+
         Ok(all)
     }
 }
@@ -132,6 +150,7 @@ impl Parse for HelperAttr {
         let ident = input.parse::<Ident>()?;
         match &*ident.to_string() {
             "generated" => Ok(Self::Generated),
+            "primary_key" => Ok(Self::PrimaryKey),
             "table" => parse_assign::<LitStr>(ident.span(), &input)
                 .map(|lit| lit.value())
                 .map(Self::TableName),

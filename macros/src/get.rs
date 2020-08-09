@@ -1,27 +1,19 @@
-use crate::{connection_type, Accessor, Entity, EntityField, function_name};
+use crate::{connection_type, function_name, Accessor, Entity, EntityField};
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
 use syn::{Ident, Type};
 
-pub(crate) fn generate(entity: &Entity, field: &EntityField, accessor: &Accessor) -> TokenStream2 {
-    let fn_name = function_name("get", )
-    let fn_name = &accessor
-        .clone()
-        .unwrap_or_else(|| Ident::new(&format!("by_{}", field.rust_ident), Span::call_site()));
-
-
-    let ty = &field.ty;
-    match &get.quantity {
-        GetQuantity::Optional => fetch_optional(fn_name, ty, &query),
-        GetQuantity::Single => fetch_single(fn_name, ty, &query),
-        GetQuantity::Multiple => fetch_multiple(fn_name, ty, &query),
-    }
-}
-
 fn build_query(table_name: &str, fields: &[EntityField], by: &EntityField) -> String {
     let columns = fields
         .iter()
-        .map(|field| format!("{} AS {}", field.db_ident, field.rust_ident))
+        .map(|field| {
+            let rust_ident = field.rust_ident.to_string();
+            if field.db_ident == rust_ident {
+                rust_ident
+            } else {
+                format!("{} AS {}", field.db_ident, rust_ident)
+            }
+        })
         .collect::<Vec<_>>()
         .join(", ");
 
@@ -31,8 +23,11 @@ fn build_query(table_name: &str, fields: &[EntityField], by: &EntityField) -> St
     )
 }
 
-fn fetch_multiple(fn_name: &Ident, by: &Type, query: &str) -> TokenStream2 {
+pub(crate) fn many(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     let con = connection_type();
+    let by = &field.ty;
+    let query = build_query(&entity.table_name, &entity.fields, field);
+
     quote! {
         pub async fn #fn_name<'e>(
             con: &'e mut #con,
@@ -45,8 +40,11 @@ fn fetch_multiple(fn_name: &Ident, by: &Type, query: &str) -> TokenStream2 {
     }
 }
 
-fn fetch_single(fn_name: &Ident, by: &Type, query: &str) -> TokenStream2 {
+pub(crate) fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     let con = connection_type();
+    let by = &field.ty;
+    let query = build_query(&entity.table_name, &entity.fields, field);
+
     quote! {
         pub async fn #fn_name<'e>(
             con: &'e mut #con,
@@ -59,8 +57,11 @@ fn fetch_single(fn_name: &Ident, by: &Type, query: &str) -> TokenStream2 {
     }
 }
 
-fn fetch_optional(fn_name: &Ident, by: &Type, query: &str) -> TokenStream2 {
+pub(crate) fn optional(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     let con = connection_type();
+    let by = &field.ty;
+    let query = build_query(&entity.table_name, &entity.fields, field);
+
     quote! {
         pub async fn #fn_name<'e>(
             con: &'e mut #con,

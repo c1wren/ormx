@@ -1,5 +1,5 @@
-pub use macros::Entity;
 pub use futures;
+pub use macros::Entity;
 use sqlx::FromRow;
 
 #[derive(sqlx::Type)]
@@ -14,28 +14,37 @@ enum UserRole {
 #[ormx(table = "users")]
 struct User {
     #[ormx(
-        get_optional = by_id,
-        get_one,
-        get_many,
-        set = asdf,
+        get_one = by_id,
         rename = "rowid",
-        generated)
-    ]
+        generated,
+        primary_key
+    )]
     id: i64,
-
     first_name: String,
     last_name: String,
+    #[ormx(
+        get_optional = find_by_email,
+        set = change_email
+
+    )]
     email: String,
 }
 
 #[cfg(test)]
 mod tests {
-    use sqlx::Connect;
     use crate::User;
+    use sqlx::Connection;
+    use sqlx::Result;
+    use sqlx::SqliteConnection;
 
     #[async_std::test]
-    async fn test() {
-        let mut con = sqlx::SqliteConnection::connect("sqlite:///home/realwork/ormx/test.sqlite").await.unwrap();
+    async fn test() -> Result<()> {
+        let mut con = SqliteConnection::connect("sqlite:///home/realwork/ormx/test.sqlite").await?;
+
+        let user = User::insert(&mut con, "Lana", "Rey")
+            .await?;
+
         println!("{:?}", User::by_id(&mut con, &1).await);
+        Ok(())
     }
 }
