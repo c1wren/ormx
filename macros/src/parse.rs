@@ -169,7 +169,7 @@ impl TryFrom<DeriveInput> for Entity {
             }
         }
         let table_name = table_name
-            .ok_or_else(|| Error::new(Span::call_site(), r#"missing #[table = ".."] attribute"#))?;
+            .ok_or_else(|| Error::new(Span::call_site(), r#"missing #[ormx(table = "..")] attribute"#))?;
 
         let mut primary_key: Option<EntityField> = None;
         for field in fields.iter() {

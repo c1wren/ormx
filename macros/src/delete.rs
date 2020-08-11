@@ -16,8 +16,20 @@ pub fn delete(entity: &Entity) -> TokenStream {
     let con = connection_type();
 
     quote! {
-        pub async fn delete(self, con: &mut #con) -> sqlx::Result<()> {
-            sqlx::query!(#query, self.#pkey_ident).execute(con).await?;
+        /// Delete the row from the database.
+        pub async fn delete(
+            self,
+            con: &mut #con
+        ) -> ormx::sqlx::Result<()> {
+            use ormx::sqlx;
+
+            ormx::sqlx::query!(
+                #query,
+                self.#pkey_ident
+            )
+            .execute(con)
+            .await?;
+
             Ok(())
         }
     }

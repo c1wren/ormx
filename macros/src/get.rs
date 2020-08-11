@@ -23,22 +23,22 @@ fn build_query(table_name: &str, fields: &[EntityField], by: &EntityField) -> St
     )
 }
 
-pub(crate) fn many(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
-    let con = connection_type();
-    let by = &field.ty;
-    let query = build_query(&entity.table_name, &entity.fields, field);
-
-    quote! {
-        pub async fn #fn_name<'e>(
-            con: &'e mut #con,
-            by: &'e #by
-        ) -> sqlx::Result<Self> {
-            sqlx::query_as!(Self, #query, by)
-                .fetch(con)
-                .await
-        }
-    }
-}
+// TODO
+// pub(crate) fn many(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
+//     let con = connection_type();
+//     let by = &field.ty;
+//     let query = build_query(&entity.table_name, &entity.fields, field);
+//
+//     quote! {
+//         pub fn #fn_name<'e>(
+//             con: &'e mut #con,
+//             by: #by
+//         ) -> futures::stream::BoxStream<'e, sqlx::Result<Self>> {
+//             sqlx::query_as!(Self, #query, by)
+//                 .fetch(con)
+//         }
+//     }
+// }
 
 pub(crate) fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     let con = connection_type();
@@ -49,7 +49,8 @@ pub(crate) fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> T
         pub async fn #fn_name<'e>(
             con: &'e mut #con,
             by: &'e #by
-        ) -> sqlx::Result<Self> {
+        ) -> ormx::sqlx::Result<Self> {
+            use ormx::sqlx;
             sqlx::query_as!(Self, #query, by)
                 .fetch_one(con)
                 .await
@@ -66,7 +67,8 @@ pub(crate) fn optional(entity: &Entity, field: &EntityField, fn_name: &Ident) ->
         pub async fn #fn_name<'e>(
             con: &'e mut #con,
             by: &'e #by
-        ) -> sqlx::Result<Option<Self>> {
+        ) -> ormx::sqlx::Result<Option<Self>> {
+            use ormx::sqlx;
             sqlx::query_as!(Self, #query, by)
                 .fetch_optional(con)
                 .await

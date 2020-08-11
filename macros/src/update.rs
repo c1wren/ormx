@@ -12,7 +12,7 @@ pub fn update_struct(entity: &Entity) -> TokenStream {
     let vis = &entity.visibility;
     let fields = entity.updatable_fields();
     let doc = format!(
-        "Helper to update [{}]({}) in the database",
+        "Helper to update [{}]({}) in the database.",
         entity.ident, entity.ident
     );
     quote! {
@@ -53,7 +53,8 @@ pub fn update_fn(entity: &Entity) -> TokenStream {
             &mut self,
             con: &mut #con,
             update: #update_ident,
-        ) -> sqlx::Result<()> {
+        ) -> ormx::sqlx::Result<()> {
+            use ormx::sqlx;
             sqlx::query!(
                 #query,
                 #(self.#update_fields,)*

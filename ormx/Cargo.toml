@@ -7,7 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies.sqlx]
-git = "https://github.com/launchbadge/sqlx"
+version = "0.4.0-beta.1"
 default-features = false
 features = ["macros", "sqlite"]
 
@@ -23,8 +23,7 @@ features = ["derive"]
 optional = true
 
 [features]
-default = ["sqlite", "runtime-async-std"]
-
+default = ["runtime-async-std"]
 sqlite = ["macros/sqlite", "sqlx/sqlite"]
 mysql = ["macros/mysql", "sqlx/mysql"]
 postgres = ["macros/postgres", "sqlx/postgres"]
