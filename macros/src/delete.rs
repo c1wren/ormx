@@ -21,7 +21,7 @@ pub fn delete(entity: &Entity) -> TokenStream {
             self,
             con: &mut #con
         ) -> sqlx::Result<()> {
-            ormx::sqlx::query!(
+            sqlx::query!(
                 #query,
                 self.#pkey_ident
             )
