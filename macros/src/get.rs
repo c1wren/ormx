@@ -1,17 +1,17 @@
-use crate::{connection_type, function_name, Accessor, Entity, EntityField};
-use proc_macro2::{Span, TokenStream as TokenStream2};
+use crate::{connection_type, Entity, EntityField};
+use proc_macro2::{TokenStream as TokenStream2};
 use quote::quote;
-use syn::{Ident, Type};
+use syn::Ident;
 
 fn build_query(table_name: &str, fields: &[EntityField], by: &EntityField) -> String {
     let columns = fields
         .iter()
         .map(|field| {
-            let rust_ident = field.rust_ident.to_string();
-            if field.db_ident == rust_ident {
+            let rust_ident = field.ident.to_string();
+            if field.column_name == rust_ident {
                 rust_ident
             } else {
-                format!("{} AS {}", field.db_ident, rust_ident)
+                format!("{} AS {}", field.column_name, rust_ident)
             }
         })
         .collect::<Vec<_>>()
@@ -19,7 +19,7 @@ fn build_query(table_name: &str, fields: &[EntityField], by: &EntityField) -> St
 
     format!(
         "SELECT {} FROM {} WHERE {} = ?",
-        columns, table_name, by.db_ident
+        columns, table_name, by.column_name
     )
 }
 

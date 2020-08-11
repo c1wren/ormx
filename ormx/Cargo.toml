@@ -17,6 +17,11 @@ path = "../macros"
 [dependencies.futures]
 version = "0.3"
 
+[dependencies.serde]
+version = "1"
+features = ["derive"]
+optional = true
+
 [features]
 default = ["sqlite", "runtime-async-std"]
 
@@ -25,6 +30,7 @@ mysql = ["macros/mysql", "sqlx/mysql"]
 postgres = ["macros/postgres", "sqlx/postgres"]
 runtime-tokio = ["sqlx/runtime-tokio"]
 runtime-async-std = ["sqlx/runtime-async-std"]
+serde-support = ["serde", "macros/serde-support"]
 
 
 [dev-dependencies]

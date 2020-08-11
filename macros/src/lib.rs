@@ -3,36 +3,17 @@ extern crate proc_macro;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
 use std::convert::TryFrom;
-use std::fmt;
-use syn::export::Formatter;
 use syn::*;
 
+pub(crate) use parse::{Entity, EntityField};
+
+mod delete;
 mod get;
 mod insert;
 mod parse;
 mod set;
+mod update;
 mod utils;
-
-#[derive(Clone)]
-pub(crate) struct EntityField {
-    get_one: Option<Ident>,
-    get_optional: Option<Ident>,
-    get_many: Option<Ident>,
-    set: Option<Ident>,
-    generated: bool,
-    primary_key: bool,
-
-    db_ident: String,
-    rust_ident: Ident,
-    ty: Type,
-}
-
-pub(crate) struct Entity {
-    table_name: String,
-    ident: Ident,
-    fields: Vec<EntityField>,
-    primary_key: Option<EntityField>,
-}
 
 fn connection_type() -> TokenStream2 {
     #[cfg(feature = "sqlite")]
@@ -44,6 +25,18 @@ fn connection_type() -> TokenStream2 {
 }
 
 impl Entity {
+    pub(crate) fn generated_fields(&self) -> impl Iterator<Item = &EntityField> {
+        self.fields.iter().filter(|field| field.generated)
+    }
+
+    pub(crate) fn data_fields(&self) -> impl Iterator<Item = &EntityField> {
+        self.fields.iter().filter(|field| !field.generated)
+    }
+
+    pub(crate) fn updatable_fields(&self) -> impl Iterator<Item = &EntityField> {
+        self.fields.iter().filter(|field| field.updatable)
+    }
+
     pub(crate) fn getters(&self) -> TokenStream2 {
         self.fields
             .iter()
@@ -82,40 +75,48 @@ impl Entity {
             .collect::<Vec<_>>();
 
         if fields.is_empty() {
-            return Ok(quote!())
+            return Ok(quote!());
         }
 
         let primary_key = match &self.primary_key {
             Some(primary_key) => primary_key,
-            None => return Err(Error::new(Span::call_site(), "#[set] requires a primary key"))
+            None => {
+                return Err(Error::new(
+                    Span::call_site(),
+                    "#[set] requires a primary key",
+                ))
+            }
         };
 
-        fields.into_iter()
+        fields
+            .into_iter()
             .map(|(field, set)| set::set(self, primary_key, field, set))
             .collect()
-    }
-
-    fn gen_insert(&self) -> TokenStream2 {
-        let fields = self
-            .fields
-            .iter()
-            .map(|EntityField { rust_ident, ty, .. }| quote!(#rust_ident));
-
-        quote! {}
     }
 }
 
 fn derive_entity(input: DeriveInput) -> Result<TokenStream2> {
-    let ty = &input.ident;
-    let entity = Entity::try_from(&input)?;
+    let ty = input.ident.clone();
+    let entity = Entity::try_from(input)?;
     let getters = entity.getters();
     let setters = entity.setters()?;
+    let insert_struct = insert::insert_struct(&entity);
+    let insert_fn = insert::insert_fn(&entity)?;
+    let update_struct = update::update_struct(&entity);
+    let update_fn = update::update_fn(&entity);
+    let delete = delete::delete(&entity);
 
     Ok(quote! {
         impl #ty {
             #getters
             #setters
+            #delete
+            #insert_fn
+            #update_fn
         }
+
+        #insert_struct
+        #update_struct
     })
 }
 
@@ -129,9 +130,3 @@ pub fn derive_entity_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
     .into()
 }
 
-fn function_name(prefix: &str, field: &Ident, rename: &Option<Ident>) -> Ident {
-    match rename {
-        None => Ident::new(&format!("{}_{}", prefix, field), Span::call_site()),
-        Some(accessor) => accessor.clone(),
-    }
-}

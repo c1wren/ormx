@@ -1,15 +1,38 @@
-use crate::{Entity, EntityField, HelperAttr};
-use proc_macro2::{Span, TokenTree};
+use proc_macro2::{Span, TokenStream};
+use quote::quote;
+use quote::ToTokens;
 use std::convert::TryFrom;
-use syn::parse::{Parse, ParseBuffer, ParseStream};
+use std::fmt;
+use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::token::Token;
 use syn::*;
 
-pub(crate) type Accessor = Option<Ident>;
+#[derive(Clone)]
+pub struct EntityField {
+    pub get_one: Option<Ident>,
+    pub get_optional: Option<Ident>,
+    pub get_many: Option<Ident>,
+    pub set: Option<Ident>,
+    pub generated: bool,
+    pub primary_key: bool,
+    pub updatable: bool,
+    pub column_name: String,
+    pub ident: Ident,
+    pub ty: Type,
+}
 
-pub(crate) enum HelperAttr {
+pub struct Entity {
+    pub table_name: String,
+    pub ident: Ident,
+    pub fields: Vec<EntityField>,
+    pub primary_key: Option<EntityField>,
+    pub visibility: Visibility,
+}
+
+pub type Accessor = Option<Ident>;
+
+pub enum HelperAttr {
     Generated,
     TableName(String),
     Rename(String),
@@ -17,14 +40,24 @@ pub(crate) enum HelperAttr {
     GetOptional(Accessor),
     GetMany(Accessor),
     Set(Accessor),
+    Update(bool),
     PrimaryKey,
+}
+
+impl ToTokens for EntityField {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let ident = &self.ident;
+        let ty = &self.ty;
+        tokens.extend(quote!(pub #ident: #ty));
+    }
 }
 
 impl fmt::Display for HelperAttr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "#[ormx(")?;
         match self {
-            HelperAttr::Generated => write!(f, "#[generated]"),
-            HelperAttr::TableName(table) => write!(f, "#[table = {:?}]", table),
+            HelperAttr::Generated => write!(f, "generated"),
+            HelperAttr::TableName(table) => write!(f, "table = {:?}", table),
             HelperAttr::Rename(rename) => write!(f, "rename = {:?}", rename),
             HelperAttr::GetOne(None) => write!(f, "get_one"),
             HelperAttr::GetOne(Some(func)) => write!(f, "get_one = {}", func),
@@ -35,10 +68,12 @@ impl fmt::Display for HelperAttr {
             HelperAttr::Set(None) => write!(f, "set"),
             HelperAttr::Set(Some(func)) => write!(f, "set = {}", func),
             HelperAttr::PrimaryKey => write!(f, "primary_key"),
-        }
+            HelperAttr::Update(true) => write!(f, "update(include)"),
+            HelperAttr::Update(false) => write!(f, "update(exclude)"),
+        }?;
+        write!(f, ")]")
     }
 }
-
 
 impl TryFrom<&Field> for EntityField {
     type Error = Error;
@@ -54,16 +89,23 @@ impl TryFrom<&Field> for EntityField {
             get_many: None,
             set: None,
             ty: field.ty.clone(),
-            db_ident: ident.to_string(),
-            rust_ident: ident.clone(),
+            column_name: ident.to_string(),
+            ident: ident.clone(),
             generated: false,
-            primary_key: false
+            primary_key: false,
+            updatable: true,
         };
         for attr in HelperAttr::parse_all(&field.attrs)? {
             match attr {
-                HelperAttr::Generated => result.generated = true,
-                HelperAttr::PrimaryKey => result.primary_key = true,
-                HelperAttr::Rename(r) => result.db_ident = r,
+                HelperAttr::Generated => {
+                    result.generated = true;
+                    result.updatable = false;
+                }
+                HelperAttr::PrimaryKey => {
+                    result.primary_key = true;
+                    result.updatable = false;
+                }
+                HelperAttr::Rename(r) => result.column_name = r,
                 HelperAttr::GetOne(g) => {
                     let fn_name = g.unwrap_or_else(|| get_ident("get_by"));
                     result.get_one = Some(fn_name)
@@ -80,7 +122,15 @@ impl TryFrom<&Field> for EntityField {
                     let fn_name = s.unwrap_or_else(|| get_ident("set"));
                     result.set = Some(fn_name);
                 }
-                x => return Err(Error::new(Span::call_site(), format!("unexpected attribute {}", x))),
+                HelperAttr::Update(updatable) => {
+                    result.updatable = updatable;
+                }
+                x => {
+                    return Err(Error::new(
+                        Span::call_site(),
+                        format!("unexpected attribute {}", x),
+                    ))
+                }
             }
         }
 
@@ -88,10 +138,10 @@ impl TryFrom<&Field> for EntityField {
     }
 }
 
-impl TryFrom<&DeriveInput> for Entity {
+impl TryFrom<DeriveInput> for Entity {
     type Error = Error;
 
-    fn try_from(input: &DeriveInput) -> Result<Self> {
+    fn try_from(input: DeriveInput) -> Result<Self> {
         let ident = input.ident.clone();
         let data_struct = match &input.data {
             Data::Struct(s) => s,
@@ -115,7 +165,7 @@ impl TryFrom<&DeriveInput> for Entity {
                 HelperAttr::TableName(name) => {
                     table_name.replace(name).map_or(Ok(()), duplicate)?
                 }
-                other => return Err(Error::new(Span::call_site(), "unexpected attribute")),
+                _ => return Err(Error::new(Span::call_site(), "unexpected attribute")),
             }
         }
         let table_name = table_name
@@ -125,7 +175,7 @@ impl TryFrom<&DeriveInput> for Entity {
         for field in fields.iter() {
             if field.primary_key {
                 if primary_key.is_some() {
-                    return Err(Error::new(Span::call_site(), "duplicate primary key"))
+                    return Err(Error::new(Span::call_site(), "duplicate primary key"));
                 }
                 primary_key = Some(field.clone());
             }
@@ -136,10 +186,10 @@ impl TryFrom<&DeriveInput> for Entity {
             fields,
             ident,
             primary_key,
+            visibility: input.vis,
         })
     }
 }
-
 
 fn get_fields(span: Span, input: &DataStruct) -> Result<Vec<&Field>> {
     match &input.fields {
@@ -186,6 +236,24 @@ impl Parse for HelperAttr {
             "get_one" => parse_optional_assign::<Ident>(&input).map(Self::GetOne),
             "get_optional" => parse_optional_assign::<Ident>(&input).map(Self::GetOptional),
             "get_many" => parse_optional_assign::<Ident>(&input).map(Self::GetMany),
+            "update" => {
+                let content;
+                parenthesized!(content in input);
+                let ident = content.parse::<Ident>()?;
+                if !content.is_empty() {
+                    panic!("unexpected {:?}", content);
+                }
+                match &*ident.to_string() {
+                    "exclude" => Ok(HelperAttr::Update(false)),
+                    "include" => Ok(HelperAttr::Update(true)),
+                    other => {
+                        return Err(Error::new(
+                            Span::call_site(),
+                            format!("expected 'exclude' or 'include', got '{}'", other),
+                        ))
+                    }
+                }
+            }
             other => Err(Error::new(
                 ident.span(),
                 &format!("unknown attribute key `{}`", other),
@@ -209,8 +277,4 @@ fn parse_optional_assign<V: Parse>(input: &ParseStream) -> Result<Option<V>> {
 
 fn duplicate<T>(_: T) -> Result<()> {
     Err(Error::new(Span::call_site(), "duplicate attribute"))
-}
-
-fn concat_ident(prefix: &str, ident: &Ident) -> Ident {
-    Ident::new(&format!("{}_{}", prefix, ident), Span::call_site())
 }

@@ -1,6 +1,4 @@
-pub use futures;
 pub use macros::Entity;
-
 
 #[cfg(feature = "sqlite")]
 type Con = sqlx::SqliteConnection;
@@ -11,7 +9,7 @@ type Con = sqlx::PostgresConnection;
 
 #[derive(Entity)]
 #[ormx(table = "users")]
-struct User {
+pub struct User {
     #[ormx(generated, primary_key, get_one = by_id)]
     user_id: i64,
     first_name: String,
