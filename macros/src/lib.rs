@@ -17,11 +17,11 @@ mod utils;
 
 fn connection_type() -> TokenStream2 {
     if cfg!(feature = "sqlite") {
-        quote!(ormx::sqlx::SqliteConnection)
+        quote!(sqlx::SqliteConnection)
     } else if cfg!(feature = "mysql") {
-        quote!(ormx::sqlx::MySqlConnection)
+        quote!(sqlx::MySqlConnection)
     } else if cfg!(feature = "postgres") {
-        quote!(ormx::sqlx::PostgresConnection)
+        quote!(sqlx::PostgresConnection)
     } else {
         panic!("no database selected ('sqlite', 'mysql', 'postgres')")
     }

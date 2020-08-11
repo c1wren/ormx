@@ -20,9 +20,7 @@ pub fn delete(entity: &Entity) -> TokenStream {
         pub async fn delete(
             self,
             con: &mut #con
-        ) -> ormx::sqlx::Result<()> {
-            use ormx::sqlx;
-
+        ) -> sqlx::Result<()> {
             ormx::sqlx::query!(
                 #query,
                 self.#pkey_ident

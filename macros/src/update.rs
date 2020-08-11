@@ -53,8 +53,7 @@ pub fn update_fn(entity: &Entity) -> TokenStream {
             &mut self,
             con: &mut #con,
             update: #update_ident,
-        ) -> ormx::sqlx::Result<()> {
-            use ormx::sqlx;
+        ) -> sqlx::Result<()> {
             sqlx::query!(
                 #query,
                 #(self.#update_fields,)*

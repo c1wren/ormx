@@ -6,11 +6,6 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies.sqlx]
-version = "0.4.0-beta.1"
-default-features = false
-features = ["macros", "sqlite"]
-
 [dependencies.macros]
 path = "../macros"
 
@@ -23,14 +18,10 @@ features = ["derive"]
 optional = true
 
 [features]
-default = ["runtime-async-std"]
-sqlite = ["macros/sqlite", "sqlx/sqlite"]
-mysql = ["macros/mysql", "sqlx/mysql"]
-postgres = ["macros/postgres", "sqlx/postgres"]
-runtime-tokio = ["sqlx/runtime-tokio"]
-runtime-async-std = ["sqlx/runtime-async-std"]
+sqlite = ["macros/sqlite"]
+mysql = ["macros/mysql"]
+postgres = ["macros/postgres"]
 serde-support = ["serde", "macros/serde-support"]
-
 
 [dev-dependencies]
 async-std = { version = "1.6", features = ["attributes"] }

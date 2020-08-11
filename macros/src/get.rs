@@ -49,8 +49,7 @@ pub(crate) fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> T
         pub async fn #fn_name<'e>(
             con: &'e mut #con,
             by: &'e #by
-        ) -> ormx::sqlx::Result<Self> {
-            use ormx::sqlx;
+        ) -> sqlx::Result<Self> {
             sqlx::query_as!(Self, #query, by)
                 .fetch_one(con)
                 .await
@@ -67,8 +66,7 @@ pub(crate) fn optional(entity: &Entity, field: &EntityField, fn_name: &Ident) ->
         pub async fn #fn_name<'e>(
             con: &'e mut #con,
             by: &'e #by
-        ) -> ormx::sqlx::Result<Option<Self>> {
-            use ormx::sqlx;
+        ) -> sqlx::Result<Option<Self>> {
             sqlx::query_as!(Self, #query, by)
                 .fetch_optional(con)
                 .await

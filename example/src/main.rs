@@ -1,4 +1,3 @@
-use ormx::sqlx;
 use sqlx::Connection;
 
 #[tokio::main]

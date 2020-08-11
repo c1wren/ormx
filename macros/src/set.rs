@@ -25,8 +25,7 @@ pub(crate) fn set(
             &mut self,
             con: &'e mut #con,
             value: #field_ty
-        ) -> ormx::sqlx::Result<()> {
-            use ormx::sqlx;
+        ) -> sqlx::Result<()> {
             sqlx::query!(#query, value, &self.#pkey)
                 .execute(con)
                 .await?;

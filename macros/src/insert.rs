@@ -56,9 +56,7 @@ pub fn insert_fn(entity: &Entity) -> Result<TokenStream> {
         pub async fn insert(
             con: &mut #con,
             #insert_struct_param,
-        ) -> ormx::sqlx::Result<()> {
-            use ormx::sqlx;
-
+        ) -> sqlx::Result<()> {
             sqlx::query!(
                 #query,
                 #(insert.#data_field_idents),*
