@@ -1,10 +1,8 @@
+use crate::attrs::{EntityAttr, FieldAttr};
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use quote::ToTokens;
 use std::convert::TryFrom;
-use std::fmt;
-use syn::parse::{Parse, ParseStream};
-use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::*;
 
@@ -14,34 +12,52 @@ pub struct EntityField {
     pub get_optional: Option<Ident>,
     pub get_many: Option<Ident>,
     pub set: Option<Ident>,
-    pub generated: bool,
-    pub primary_key: bool,
-    pub updatable: bool,
     pub column_name: String,
     pub ident: Ident,
     pub ty: Type,
+
+    pub generated: bool,
+    pub updatable: bool,
+    pub patchable: bool,
 }
 
 pub struct Entity {
     pub table_name: String,
+    pub id: EntityField,
     pub ident: Ident,
     pub fields: Vec<EntityField>,
-    pub primary_key: Option<EntityField>,
-    pub visibility: Visibility,
+    pub vis: Visibility,
+
+    pub insert: Option<Ident>,
+    pub patch: Option<Ident>,
 }
 
-pub type Accessor = Option<Ident>;
+impl Entity {
+    pub fn insertable_fields(&self) -> impl Iterator<Item = &EntityField> {
+        let id = self.id.ident.clone();
+        self.fields
+            .iter()
+            .filter(move |field| !(&id == &field.ident || field.generated))
+    }
 
-pub enum HelperAttr {
-    Generated,
-    TableName(String),
-    Rename(String),
-    GetOne(Accessor),
-    GetOptional(Accessor),
-    GetMany(Accessor),
-    Set(Accessor),
-    Update(bool),
-    PrimaryKey,
+    pub fn generated_fields(&self) -> impl Iterator<Item = &EntityField> {
+        self.fields.iter().filter(move |field| field.generated)
+    }
+
+    pub fn patchable_fields(&self) -> impl Iterator<Item = &EntityField> {
+        let id = self.id.ident.clone();
+        self.fields
+            .iter()
+            .filter(move |field| &field.ident != &id && field.patchable)
+    }
+
+    pub fn updatable_fields(&self) -> impl Iterator<Item = &EntityField> {
+        let id = self.id.ident.clone();
+        self.fields
+            .iter()
+            .filter(move |field| &field.ident != &id && field.updatable)
+
+    }
 }
 
 impl ToTokens for EntityField {
@@ -49,29 +65,6 @@ impl ToTokens for EntityField {
         let ident = &self.ident;
         let ty = &self.ty;
         tokens.extend(quote!(pub #ident: #ty));
-    }
-}
-
-impl fmt::Display for HelperAttr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "#[ormx(")?;
-        match self {
-            HelperAttr::Generated => write!(f, "generated"),
-            HelperAttr::TableName(table) => write!(f, "table = {:?}", table),
-            HelperAttr::Rename(rename) => write!(f, "rename = {:?}", rename),
-            HelperAttr::GetOne(None) => write!(f, "get_one"),
-            HelperAttr::GetOne(Some(func)) => write!(f, "get_one = {}", func),
-            HelperAttr::GetOptional(None) => write!(f, "get_optional"),
-            HelperAttr::GetOptional(Some(func)) => write!(f, "get_optional = {}", func),
-            HelperAttr::GetMany(None) => write!(f, "get_many"),
-            HelperAttr::GetMany(Some(func)) => write!(f, "get_many = {}", func),
-            HelperAttr::Set(None) => write!(f, "set"),
-            HelperAttr::Set(Some(func)) => write!(f, "set = {}", func),
-            HelperAttr::PrimaryKey => write!(f, "primary_key"),
-            HelperAttr::Update(true) => write!(f, "update(include)"),
-            HelperAttr::Update(false) => write!(f, "update(exclude)"),
-        }?;
-        write!(f, ")]")
     }
 }
 
@@ -91,45 +84,34 @@ impl TryFrom<&Field> for EntityField {
             ty: field.ty.clone(),
             column_name: ident.to_string(),
             ident: ident.clone(),
-            generated: false,
-            primary_key: false,
             updatable: true,
+            patchable: true,
+            generated: false,
         };
-        for attr in HelperAttr::parse_all(&field.attrs)? {
+        for attr in crate::attrs::parse_all::<FieldAttr>(&field.attrs)? {
             match attr {
-                HelperAttr::Generated => {
-                    result.generated = true;
-                    result.updatable = false;
-                }
-                HelperAttr::PrimaryKey => {
-                    result.primary_key = true;
-                    result.updatable = false;
-                }
-                HelperAttr::Rename(r) => result.column_name = r,
-                HelperAttr::GetOne(g) => {
+                FieldAttr::Rename(r) => result.column_name = r,
+                FieldAttr::GetOne(g) => {
                     let fn_name = g.unwrap_or_else(|| get_ident("get_by"));
                     result.get_one = Some(fn_name)
                 }
-                HelperAttr::GetOptional(g) => {
+                FieldAttr::GetOptional(g) => {
                     let fn_name = g.unwrap_or_else(|| get_ident("get_by"));
                     result.get_optional = Some(fn_name);
                 }
-                HelperAttr::GetMany(g) => {
+                FieldAttr::GetMany(g) => {
                     let fn_name = g.unwrap_or_else(|| get_ident("get_by"));
                     result.get_many = Some(fn_name);
                 }
-                HelperAttr::Set(s) => {
+                FieldAttr::Set(s) => {
                     let fn_name = s.unwrap_or_else(|| get_ident("set"));
                     result.set = Some(fn_name);
                 }
-                HelperAttr::Update(updatable) => {
-                    result.updatable = updatable;
-                }
-                x => {
-                    return Err(Error::new(
-                        Span::call_site(),
-                        format!("unexpected attribute {}", x),
-                    ))
+                FieldAttr::Updatable(updatable) => result.updatable = updatable,
+                FieldAttr::Patchable(patchable) => result.patchable = patchable,
+                FieldAttr::Generated => {
+                    result.generated = true;
+                    result.patchable = false;
                 }
             }
         }
@@ -153,40 +135,48 @@ impl TryFrom<DeriveInput> for Entity {
             }
         };
 
-        let fields = get_fields(input.span(), &data_struct)?;
-        let fields = fields
+        let mut table_name = None;
+        let mut id = None;
+        let mut insert = None;
+        let mut patch = None;
+        for attr in crate::attrs::parse_all::<EntityAttr>(&input.attrs)? {
+            match attr {
+                EntityAttr::Table(name) => table_name.replace(name).map_or(Ok(()), duplicate)?,
+                EntityAttr::Id(new_id) => id.replace(new_id).map_or(Ok(()), duplicate)?,
+                EntityAttr::Insertable(struct_ident) => {
+                    let struct_ident = struct_ident.unwrap_or_else(|| {
+                        Ident::new(&format!("Insert{}", ident), Span::call_site())
+                    });
+                    insert.replace(struct_ident).map_or(Ok(()), duplicate)?
+                }
+                EntityAttr::Patchable(struct_ident) => {
+                    let struct_ident = struct_ident.unwrap_or_else(|| {
+                        Ident::new(&format!("Patch{}", ident), Span::call_site())
+                    });
+                    patch.replace(struct_ident).map_or(Ok(()), duplicate)?
+                }
+            }
+        }
+        let table_name = table_name.ok_or_else(|| missing_attr("table"))?;
+        let id = id.ok_or_else(|| missing_attr("id"))?;
+
+        let fields = get_fields(input.span(), &data_struct)?
             .into_iter()
             .map(EntityField::try_from)
             .collect::<Result<Vec<_>>>()?;
 
-        let mut table_name = None;
-        for attr in HelperAttr::parse_all(&input.attrs)? {
-            match attr {
-                HelperAttr::TableName(name) => {
-                    table_name.replace(name).map_or(Ok(()), duplicate)?
-                }
-                _ => return Err(Error::new(Span::call_site(), "unexpected attribute")),
-            }
-        }
-        let table_name = table_name
-            .ok_or_else(|| Error::new(Span::call_site(), r#"missing #[ormx(table = "..")] attribute"#))?;
-
-        let mut primary_key: Option<EntityField> = None;
-        for field in fields.iter() {
-            if field.primary_key {
-                if primary_key.is_some() {
-                    return Err(Error::new(Span::call_site(), "duplicate primary key"));
-                }
-                primary_key = Some(field.clone());
-            }
-        }
-
         Ok(Entity {
             table_name,
+            id: fields
+                .iter()
+                .find(|field| field.ident == id)
+                .expect("the struct does not have this field")
+                .clone(),
             fields,
             ident,
-            primary_key,
-            visibility: input.vis,
+            vis: input.vis,
+            insert,
+            patch,
         })
     }
 }
@@ -203,78 +193,13 @@ fn get_fields(span: Span, input: &DataStruct) -> Result<Vec<&Field>> {
     }
 }
 
-impl HelperAttr {
-    fn parse_all(attrs: &[Attribute]) -> Result<Vec<HelperAttr>> {
-        let all = attrs
-            .iter()
-            .filter(|attr| attr.path.is_ident("ormx"))
-            .map(|attr| {
-                attr.parse_args_with(Punctuated::<HelperAttr, Token![,]>::parse_separated_nonempty)
-            })
-            .collect::<Result<Vec<_>>>()?
-            .into_iter()
-            .flatten()
-            .collect();
-
-        Ok(all)
-    }
-}
-
-impl Parse for HelperAttr {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let ident = input.parse::<Ident>()?;
-        match &*ident.to_string() {
-            "generated" => Ok(Self::Generated),
-            "primary_key" => Ok(Self::PrimaryKey),
-            "table" => parse_assign::<LitStr>(ident.span(), &input)
-                .map(|lit| lit.value())
-                .map(Self::TableName),
-            "rename" => parse_assign::<LitStr>(ident.span(), &input)
-                .map(|lit| lit.value())
-                .map(Self::Rename),
-            "set" => parse_optional_assign::<Ident>(&input).map(Self::Set),
-            "get_one" => parse_optional_assign::<Ident>(&input).map(Self::GetOne),
-            "get_optional" => parse_optional_assign::<Ident>(&input).map(Self::GetOptional),
-            "get_many" => parse_optional_assign::<Ident>(&input).map(Self::GetMany),
-            "update" => {
-                let content;
-                parenthesized!(content in input);
-                let ident = content.parse::<Ident>()?;
-                if !content.is_empty() {
-                    panic!("unexpected {:?}", content);
-                }
-                match &*ident.to_string() {
-                    "exclude" => Ok(HelperAttr::Update(false)),
-                    "include" => Ok(HelperAttr::Update(true)),
-                    other => {
-                        return Err(Error::new(
-                            Span::call_site(),
-                            format!("expected 'exclude' or 'include', got '{}'", other),
-                        ))
-                    }
-                }
-            }
-            other => Err(Error::new(
-                ident.span(),
-                &format!("unknown attribute key `{}`", other),
-            )),
-        }
-    }
-}
-
-fn parse_assign<V: Parse>(span: Span, input: &ParseStream) -> Result<V> {
-    parse_optional_assign(&input)?.ok_or_else(|| Error::new(span, "missing value"))
-}
-
-fn parse_optional_assign<V: Parse>(input: &ParseStream) -> Result<Option<V>> {
-    Ok(if input.peek(Token![=]) {
-        input.parse::<Token![=]>()?;
-        Some(input.parse()?)
-    } else {
-        None
-    })
-}
-
 fn duplicate<T>(_: T) -> Result<()> {
     Err(Error::new(Span::call_site(), "duplicate attribute"))
+}
+
+fn missing_attr(name: &str) -> Error {
+    Error::new(
+        Span::call_site(),
+        &format!(r#"missing #[ormx({} = "..")) attribute"#, name),
+    )
 }

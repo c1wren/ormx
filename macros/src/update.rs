@@ -1,69 +1,29 @@
-use crate::{connection_type, Entity};
-use proc_macro2::{Span, TokenStream};
+use crate::Entity;
+use itertools::Itertools;
+use proc_macro2::TokenStream;
 use quote::quote;
-use syn::Ident;
 
-fn update_struct_ident(entity: &Entity) -> Ident {
-    Ident::new(&format!("Update{}", entity.ident), Span::call_site())
-}
-
-pub fn update_struct(entity: &Entity) -> TokenStream {
-    let ident = update_struct_ident(entity);
-    let vis = &entity.visibility;
-    let fields = entity.updatable_fields();
-    let doc = format!(
-        "Helper to update [{}]({}) in the database.",
-        entity.ident, entity.ident
-    );
-    quote! {
-        #[derive(Debug)]
-        #[cfg_attr(feature = "serde-support", derive(serde::Serialize, serde::Deserialize))]
-        #[doc = #doc]
-        #vis struct #ident {
-            #(#fields),*
-        }
-    }
-}
-
-pub fn update_fn(entity: &Entity) -> TokenStream {
-    let pkey = match &entity.primary_key {
-        Some(pkey) => pkey,
-        None => return quote!(),
-    };
-    let query = format!(
+pub fn update(entity: &Entity) -> TokenStream {
+    let sql = format!(
         "UPDATE {} SET {} WHERE {} = ?",
         entity.table_name,
         entity
             .updatable_fields()
-            .map(|field| format!("{}=?", field.column_name))
-            .collect::<Vec<_>>()
+            .map(|field| format!("{} = ?", field.column_name))
             .join(","),
-        pkey.column_name
+        entity.id.column_name
     );
-    let con = connection_type();
-    let update_fields = entity
-        .updatable_fields()
-        .map(|field| &field.ident)
-        .collect::<Vec<_>>();
-    let pkey_ident = &pkey.ident;
-    let update_ident = update_struct_ident(entity);
+
+    let id_ident = &entity.id.ident;
+    let vis = &entity.vis;
+    let updatable_fields = entity.updatable_fields().map(|field| &field.ident);
 
     quote! {
-        pub async fn update(
-            &mut self,
-            con: &mut #con,
-            update: #update_ident,
+        #vis async fn update(
+            &self,
+            con: impl sqlx::Executor<'_, Database=sqlx::MySql>
         ) -> sqlx::Result<()> {
-            sqlx::query!(
-                #query,
-                #(self.#update_fields,)*
-                self.#pkey_ident,
-            )
-            .execute(con)
-            .await?;
-
-            #(self.#update_fields = update.#update_fields;)*
-
+            sqlx::query!(#sql, #(self.#updatable_fields,)* self.#id_ident).execute(con).await?;
             Ok(())
         }
     }

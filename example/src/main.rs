@@ -1,35 +1,31 @@
-use sqlx::Connection;
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let mut con = sqlx::SqliteConnection::connect("sqlite://../test.sqlite").await?;
+    env_logger::init();
+    let pool = sqlx::MySqlPool::connect("mysql://root:admin@172.17.0.2/yourclub_backend").await?;
 
-    User::insert(
-        &mut con,
-        &InsertUser {
-            first_name: "asdf".to_owned(),
-            last_name: "xxx".to_owned(),
-            email: "asdfxx".to_owned(),
-        },
-    )
-    .await?;
+    let mut club = Club::by_id(&pool, &1).await?;
+    println!("queried: {:?}", club);
 
-    let (id,): (i64,) = sqlx::query_as("SELECT last_insert_rowid();")
-        .fetch_one(&mut con)
-        .await?;
-
-    let inserted = User::get_by_id(&mut con, &id).await?;
-    println!("{:?}", inserted);
+    println!("after patch: {:?}", club);
 
     Ok(())
 }
 
 #[derive(ormx::Entity, Debug)]
-#[ormx(table = "users")]
-struct User {
-    #[ormx(get_one = get_by_id, generated)]
-    user_id: i64,
-    first_name: String,
-    last_name: String,
-    email: String,
+#[ormx(
+    table = "clubs",
+    id = club_id,
+    insertable,
+    patchable
+)]
+struct Club {
+    #[ormx(get_one = by_id)]
+    club_id: u32,
+    #[ormx(
+        get_optional = by_name,
+        set = update_name
+    )]
+    name: String,
+    #[ormx(generated)]
+    created_at: chrono::NaiveDateTime
 }

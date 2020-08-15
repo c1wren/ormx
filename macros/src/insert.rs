@@ -1,74 +1,96 @@
-use crate::{connection_type, Entity, EntityField};
+use crate::{Entity};
 use itertools::Itertools;
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::{TokenStream};
 use quote::quote;
-use syn::Ident;
-use syn::Result;
+use std::iter::repeat;
 
-pub fn insert_struct(entity: &Entity) -> TokenStream {
-    let data_fields = entity
-        .data_fields()
-        .collect::<Vec<_>>();
-
-    if data_fields.is_empty() {
-        return quote!();
-    }
-
-    let struct_ident = insert_struct_ident(entity);
-    let doc = format!(
-        "Helper to insert [{}]({}) into the database.",
-        entity.ident, entity.ident
-    );
-    let vis = &entity.visibility;
-
-    quote! {
-        #[derive(Debug)]
-        #[cfg_attr(feature = "serde-support", derive(serde::Serialize, serde::Deserialize))]
-        #[doc = #doc]
-        #vis struct #struct_ident {
-            #(#data_fields),*
-        }
-    }
-}
-
-pub fn insert_fn(entity: &Entity) -> Result<TokenStream> {
-    let con = connection_type();
-    let data_fields: Vec<&EntityField> = entity.data_fields().collect();
-    let data_field_idents = data_fields.iter().map(|field| &field.ident);
-
-    let query = format!(
-        "INSERT INTO {} ({}) VALUES ({})",
-        entity.table_name,
-        data_fields.iter().map(|field| &field.column_name).join(","),
-        std::iter::repeat("?").take(data_fields.len()).join(",")
-    );
-
-    let insert_struct_param = match data_fields.len() {
-        0 => quote!(),
-        _ => {
-            let ident = insert_struct_ident(entity);
-            quote!(insert: &#ident)
-        }
+pub fn insert(entity: &Entity) -> TokenStream {
+    let struct_ident = match &entity.insert {
+        Some(ident) => ident,
+        None => return quote!(),
     };
 
-    Ok(quote! {
-        /// Insert a row into the database.
-        pub async fn insert(
-            con: &mut #con,
-            #insert_struct_param,
-        ) -> sqlx::Result<()> {
-            sqlx::query!(
-                #query,
-                #(insert.#data_field_idents),*
-            )
-            .execute(con)
-            .await?;
+    let fields = entity.insertable_fields();
+    let vis = &entity.vis;
+    let insert_fn = insert_fn(entity);
 
-            Ok(())
+    quote! {
+        #[derive(Debug, serde::Serialize, serde::Deserialize)]
+        #vis struct #struct_ident {
+            #(#fields),*
         }
-    })
+
+        impl #struct_ident {
+            #insert_fn
+        }
+    }
 }
 
-fn insert_struct_ident(entity: &Entity) -> Ident {
-    Ident::new(&format!("Insert{}", entity.ident), Span::call_site())
+fn insert_fn(entity: &Entity) -> TokenStream {
+    let insertable_idents = entity
+        .insertable_fields()
+        .map(|field| &field.ident)
+        .collect::<Vec<_>>();
+
+    let generated_idents = entity
+        .generated_fields()
+        .map(|field| &field.ident)
+        .collect::<Vec<_>>();
+    let query_generated = if generated_idents.is_empty() {
+        quote!()
+    } else {
+        let sql = query_generated_sql(entity);
+        quote!(let generated = sqlx::query!(#sql, last_insert_id.id).fetch_one(&mut tx).await?;)
+    };
+
+    let vis = &entity.vis;
+
+    let entity_ident = &entity.ident;
+    let insert_sql = insert_sql(entity);
+    let id_ident = &entity.id.ident;
+
+    quote! {
+        /// Insert a row into the database.
+        #vis async fn insert(
+            self,
+            __con: &mut sqlx::MySqlConnection,
+        ) -> sqlx::Result<#entity_ident> {
+            use sqlx::Connection;
+            let mut tx = __con.begin().await?;
+
+            sqlx::query!(#insert_sql, #(self.#insertable_idents),*).execute(&mut tx).await?;
+            let last_insert_id = sqlx::query!("SELECT LAST_INSERT_ID() as id").fetch_one(&mut tx).await?;
+            #query_generated
+
+            tx.commit().await?;
+
+            Ok(#entity_ident {
+                #id_ident: last_insert_id.id as _,
+                #(#insertable_idents: self.#insertable_idents,)*
+                #(#generated_idents: generated.#generated_idents),*
+            })
+        }
+    }
+}
+
+fn insert_sql(entity: &Entity) -> String {
+    let insertable = entity.insertable_fields().collect::<Vec<_>>();
+    format!(
+        "INSERT INTO {} ({}) VALUES ({})",
+        entity.table_name,
+        insertable.iter().map(|field| &field.column_name).join(","),
+        repeat("?").take(insertable.len()).join(",")
+    )
+}
+
+fn query_generated_sql(entity: &Entity) -> String {
+    format!(
+        "SELECT {} FROM {} WHERE {} = ?",
+        entity
+            .generated_fields()
+            .map(|field| format!("{} as {}", field.column_name, field.ident))
+            .join(","),
+        entity.table_name,
+        entity.id.column_name
+    )
 }
