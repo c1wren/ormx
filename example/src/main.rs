@@ -1,13 +1,6 @@
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
-    let pool = sqlx::MySqlPool::connect("mysql://root:admin@172.17.0.2/yourclub_backend").await?;
-
-    let mut club = Club::by_id(&pool, &1).await?;
-    println!("queried: {:?}", club);
-
-    println!("after patch: {:?}", club);
-
     Ok(())
 }
 
