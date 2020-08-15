@@ -3,9 +3,8 @@ use proc_macro2::{TokenStream as TokenStream2};
 use quote::quote;
 use syn::Ident;
 
-
 pub fn getters(entity: &Entity) -> TokenStream2 {
-    entity
+    let getters = entity
         .fields
         .iter()
         .flat_map(|field| {
@@ -16,16 +15,43 @@ pub fn getters(entity: &Entity) -> TokenStream2 {
                 .chain(get_optional.into_iter())
                 .chain(get_many.into_iter())
         })
-        .collect()
+        .collect::<TokenStream2>();
+
+    let get_all = get_all(entity);
+
+    quote! {
+        #get_all
+        #getters
+    }
+}
+
+fn get_all(entity: &Entity) -> TokenStream2 {
+    let fn_name = match &entity.get_all {
+        Some(ident) => ident,
+        None => return quote!()
+    };
+    let sql = format!("SELECT * FROM {}", entity.table_name);
+    let vis = &entity.vis;
+
+    quote! {
+        #vis async fn #fn_name(
+            con: impl sqlx::Executor<'_, Database=sqlx::MySql>
+        ) -> sqlx::Result<Vec<Self>> {
+            sqlx::query_as(Self, #sql)
+                .fetch_all(con)
+                .await
+        }
+    }
 }
 
 fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     println!("GET ONE!");
     let by = &field.ty;
+    let vis = &entity.vis;
     let query = build_query(&entity.table_name, &entity.fields, field);
 
     quote! {
-        pub async fn #fn_name(
+        #vis async fn #fn_name(
             con: impl sqlx::Executor<'_, Database=sqlx::MySql>,
             by: &#by
         ) -> sqlx::Result<Self> {
@@ -38,10 +64,11 @@ fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
 
 fn optional(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     let by = &field.ty;
+    let vis = &entity.vis;
     let query = build_query(&entity.table_name, &entity.fields, field);
 
     quote! {
-        pub async fn #fn_name(
+        #vis async fn #fn_name(
             con: impl sqlx::Executor<'_, Database=sqlx::MySql>,
             by: &#by
         ) -> sqlx::Result<Option<Self>> {
@@ -54,10 +81,11 @@ fn optional(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStrea
 
 fn many(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     let by = &field.ty;
+    let vis = &entity.vis;
     let query = build_query(&entity.table_name, &entity.fields, field);
 
     quote! {
-        pub async fn #fn_name(
+        #vis async fn #fn_name(
             con: impl sqlx::Executor<'_, Database=sqlx::MySql>,
             by: #by
         ) -> sqlx::Result<Vec<Self>> {

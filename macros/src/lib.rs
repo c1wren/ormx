@@ -45,10 +45,7 @@ fn derive_entity(input: DeriveInput) -> Result<TokenStream2> {
 pub fn derive_entity_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     match derive_entity(input) {
-        Ok(out) => {
-            println!("{}", out);
-            out
-        },
+        Ok(out) => out,
         Err(err) => err.to_compile_error(),
     }
     .into()

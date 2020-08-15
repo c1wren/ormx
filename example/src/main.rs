@@ -20,5 +20,5 @@ struct Club {
     )]
     name: String,
     #[ormx(generated)]
-    created_at: chrono::NaiveDateTime
+    created_at: chrono::NaiveDateTime,
 }

@@ -28,6 +28,8 @@ pub struct Entity {
     pub fields: Vec<EntityField>,
     pub vis: Visibility,
 
+    pub get_all: Option<Ident>,
+
     pub insert: Option<Ident>,
     pub patch: Option<Ident>,
 }
@@ -139,6 +141,7 @@ impl TryFrom<DeriveInput> for Entity {
         let mut id = None;
         let mut insert = None;
         let mut patch = None;
+        let mut get_all = None;
         for attr in crate::attrs::parse_all::<EntityAttr>(&input.attrs)? {
             match attr {
                 EntityAttr::Table(name) => table_name.replace(name).map_or(Ok(()), duplicate)?,
@@ -154,6 +157,10 @@ impl TryFrom<DeriveInput> for Entity {
                         Ident::new(&format!("Patch{}", ident), Span::call_site())
                     });
                     patch.replace(struct_ident).map_or(Ok(()), duplicate)?
+                }
+                EntityAttr::GetAll(fn_ident) => {
+                    let fn_ident = fn_ident.unwrap_or_else(|| Ident::new("get_all", Span::call_site()));
+                    get_all.replace(fn_ident).map_or(Ok(()), duplicate)?
                 }
             }
         }
@@ -177,6 +184,7 @@ impl TryFrom<DeriveInput> for Entity {
             vis: input.vis,
             insert,
             patch,
+            get_all
         })
     }
 }

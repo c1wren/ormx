@@ -8,6 +8,7 @@ pub enum EntityAttr {
     Id(Ident),
     Insertable(Option<Ident>),
     Patchable(Option<Ident>),
+    GetAll(Option<Ident>)
 }
 
 impl Parse for EntityAttr {
@@ -20,6 +21,7 @@ impl Parse for EntityAttr {
             "id" => parse_assign::<Ident>(ident.span(), &input).map(EntityAttr::Id),
             "insertable" => parse_optional_assign::<Ident>(&input).map(EntityAttr::Insertable),
             "patchable" => parse_optional_assign::<Ident>(&input).map(EntityAttr::Patchable),
+            "get_all" => parse_optional_assign::<Ident>(&input).map(EntityAttr::GetAll),
             other => Err(Error::new(
                 ident.span(),
                 &format!("unknown ormx attribute: `{}`", other),
