@@ -1,4 +1,4 @@
-use crate::{Entity};
+use crate::{Entity, EntityField};
 use itertools::Itertools;
 use proc_macro2::{TokenStream};
 use quote::quote;
@@ -88,7 +88,7 @@ fn query_generated_sql(entity: &Entity) -> String {
         "SELECT {} FROM {} WHERE {} = ?",
         entity
             .generated_fields()
-            .map(|field| format!("{} as {}", field.column_name, field.ident))
+            .map(EntityField::fmt_for_select)
             .join(","),
         entity.table_name,
         entity.id.column_name

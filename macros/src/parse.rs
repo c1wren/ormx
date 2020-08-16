@@ -19,6 +19,23 @@ pub struct EntityField {
     pub generated: bool,
     pub updatable: bool,
     pub patchable: bool,
+    pub custom_type: bool,
+}
+
+impl EntityField {
+    pub fn fmt_for_select(&self) -> String {
+        if self.custom_type {
+            return format!("{} AS `{}: _`", self.column_name, self.ident)
+        }
+
+        let ident = self.ident.to_string();
+
+        if ident == self.column_name {
+            ident
+        } else {
+            format!("{} AS {}", self.column_name, self.ident)
+        }
+    }
 }
 
 pub struct Entity {
@@ -58,7 +75,6 @@ impl Entity {
         self.fields
             .iter()
             .filter(move |field| &field.ident != &id && field.updatable)
-
     }
 }
 
@@ -89,6 +105,7 @@ impl TryFrom<&Field> for EntityField {
             updatable: true,
             patchable: true,
             generated: false,
+            custom_type: false
         };
         for attr in crate::attrs::parse_all::<FieldAttr>(&field.attrs)? {
             match attr {
@@ -114,6 +131,9 @@ impl TryFrom<&Field> for EntityField {
                 FieldAttr::Generated => {
                     result.generated = true;
                     result.patchable = false;
+                },
+                FieldAttr::CustomType => {
+                    result.custom_type = true;
                 }
             }
         }
@@ -159,7 +179,8 @@ impl TryFrom<DeriveInput> for Entity {
                     patch.replace(struct_ident).map_or(Ok(()), duplicate)?
                 }
                 EntityAttr::GetAll(fn_ident) => {
-                    let fn_ident = fn_ident.unwrap_or_else(|| Ident::new("get_all", Span::call_site()));
+                    let fn_ident =
+                        fn_ident.unwrap_or_else(|| Ident::new("get_all", Span::call_site()));
                     get_all.replace(fn_ident).map_or(Ok(()), duplicate)?
                 }
             }
@@ -184,7 +205,7 @@ impl TryFrom<DeriveInput> for Entity {
             vis: input.vis,
             insert,
             patch,
-            get_all
+            get_all,
         })
     }
 }

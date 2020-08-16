@@ -1,5 +1,6 @@
 use crate::{Entity, EntityField};
-use proc_macro2::{TokenStream as TokenStream2};
+use itertools::Itertools;
+use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::Ident;
 
@@ -8,10 +9,20 @@ pub fn getters(entity: &Entity) -> TokenStream2 {
         .fields
         .iter()
         .flat_map(|field| {
-            let get_one = field.get_one.as_ref().map(|name| single(entity, field, name));
-            let get_optional = field.get_optional.as_ref().map(|name| optional(entity, field, name));
-            let get_many = field.get_many.as_ref().map(|name| many(entity, field, name));
-            get_one.into_iter()
+            let get_one = field
+                .get_one
+                .as_ref()
+                .map(|name| single(entity, field, name));
+            let get_optional = field
+                .get_optional
+                .as_ref()
+                .map(|name| optional(entity, field, name));
+            let get_many = field
+                .get_many
+                .as_ref()
+                .map(|name| many(entity, field, name));
+            get_one
+                .into_iter()
                 .chain(get_optional.into_iter())
                 .chain(get_many.into_iter())
         })
@@ -28,9 +39,9 @@ pub fn getters(entity: &Entity) -> TokenStream2 {
 fn get_all(entity: &Entity) -> TokenStream2 {
     let fn_name = match &entity.get_all {
         Some(ident) => ident,
-        None => return quote!()
+        None => return quote!(),
     };
-    let sql = format!("SELECT * FROM {}", entity.table_name);
+    let sql = build_query(entity, None);
     let vis = &entity.vis;
 
     quote! {
@@ -47,7 +58,7 @@ fn get_all(entity: &Entity) -> TokenStream2 {
 fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     let by = &field.ty;
     let vis = &entity.vis;
-    let query = build_query(&entity.table_name, &entity.fields, field);
+    let query = build_query(entity, Some(field));
 
     quote! {
         #vis async fn #fn_name(
@@ -64,7 +75,7 @@ fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
 fn optional(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     let by = &field.ty;
     let vis = &entity.vis;
-    let query = build_query(&entity.table_name, &entity.fields, field);
+    let query = build_query(entity, Some(field));
 
     quote! {
         #vis async fn #fn_name(
@@ -81,7 +92,7 @@ fn optional(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStrea
 fn many(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     let by = &field.ty;
     let vis = &entity.vis;
-    let query = build_query(&entity.table_name, &entity.fields, field);
+    let query = build_query(entity, Some(field));
 
     quote! {
         #vis async fn #fn_name(
@@ -95,22 +106,25 @@ fn many(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     }
 }
 
-fn build_query(table_name: &str, fields: &[EntityField], by: &EntityField) -> String {
-    let columns = fields
+fn build_query(
+    entity: &Entity,
+    by: Option<&EntityField>,
+) -> String {
+    let columns = entity
+        .fields
         .iter()
-        .map(|field| {
-            let rust_ident = field.ident.to_string();
-            if field.column_name == rust_ident {
-                rust_ident
-            } else {
-                format!("{} AS {}", field.column_name, rust_ident)
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(", ");
+        .map(EntityField::fmt_for_select)
+        .join(",");
 
-    format!(
-        "SELECT {} FROM {} WHERE {} = ?",
-        columns, table_name, by.column_name
-    )
+    if let Some(by) = by {
+        format!(
+            "SELECT {} FROM {} WHERE {} = ?",
+            columns, entity.table_name, by.column_name
+        )
+    } else {
+        format!(
+            "SELECT {} FROM {}",
+            columns, entity.table_name
+        )
+    }
 }

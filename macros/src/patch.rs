@@ -16,7 +16,6 @@ pub fn patch(entity: &Entity) -> TokenStream {
 
     let patch_struct = patch_struct(entity, &patch_struct_ident);
     let methods = methods(entity, &patch_struct_ident);
-    let entity_ident = &entity.ident;
 
     quote! {
         #patch_struct

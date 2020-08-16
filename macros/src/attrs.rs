@@ -39,6 +39,7 @@ pub enum FieldAttr {
     Updatable(bool),
     Patchable(bool),
     Generated,
+    CustomType,
 }
 
 impl Parse for FieldAttr {
@@ -53,6 +54,7 @@ impl Parse for FieldAttr {
             "get_optional" => parse_optional_assign::<Ident>(&input).map(Self::GetOptional),
             "get_many" => parse_optional_assign::<Ident>(&input).map(Self::GetMany),
             "generated" => Ok(Self::Generated),
+            "custom_type" => Ok(Self::CustomType),
             "patchable" => Ok(Self::Patchable(
                 parse_optional_assign::<LitBool>(&input)?
                     .map(|lit| lit.value)
