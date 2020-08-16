@@ -50,4 +50,3 @@ pub fn derive_entity_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
     }
     .into()
 }
-

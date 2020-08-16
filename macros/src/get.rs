@@ -45,7 +45,6 @@ fn get_all(entity: &Entity) -> TokenStream2 {
 }
 
 fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
-    println!("GET ONE!");
     let by = &field.ty;
     let vis = &entity.vis;
     let query = build_query(&entity.table_name, &entity.fields, field);

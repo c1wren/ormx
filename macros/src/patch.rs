@@ -15,16 +15,12 @@ pub fn patch(entity: &Entity) -> TokenStream {
     }
 
     let patch_struct = patch_struct(entity, &patch_struct_ident);
-    let patch_method = patch_method(entity, &patch_struct_ident);
-    let to_patch_method = to_patch_method(entity, &patch_struct_ident);
+    let methods = methods(entity, &patch_struct_ident);
     let entity_ident = &entity.ident;
 
     quote! {
         #patch_struct
-        impl #entity_ident {
-            #patch_method
-            #to_patch_method
-        }
+        #methods
     }
 }
 
@@ -40,8 +36,8 @@ fn patch_struct(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
     }
 }
 
-fn patch_method(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
-    let query = format!(
+fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
+    let sql = format!(
         "UPDATE {} SET {} WHERE {} = ?",
         entity.table_name,
         entity
@@ -50,45 +46,51 @@ fn patch_method(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
             .join(","),
         entity.id.column_name
     );
-    let update_fields = entity
-        .patchable_fields()
-        .map(|field| &field.ident)
-        .collect::<Vec<_>>();
-    let id_ident = &entity.id.ident;
-    let vis = &entity.vis;
-
-    quote! {
-        #vis async fn patch(
-            &mut self,
-            con: impl sqlx::Executor<'_, Database=sqlx::MySql>,
-            update: #patch_struct_ident,
-        ) -> sqlx::Result<()> {
-            sqlx::query!(
-                #query,
-                #(update.#update_fields,)*
-                self.#id_ident,
-            )
-            .execute(con)
-            .await?;
-
-            #(self.#update_fields = update.#update_fields;)*
-
-            Ok(())
-        }
-    }
-}
-
-fn to_patch_method(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
-    let vis = &entity.vis;
     let patchable_fields = entity
         .patchable_fields()
         .map(|field| &field.ident)
         .collect::<Vec<_>>();
+    let id_ty = &entity.id.ty;
+    let id_ident = &entity.id.ident;
+    let entity_ident = &entity.ident;
+    let vis = &entity.vis;
 
     quote! {
-        #vis fn to_patch(&self) -> #patch_struct_ident {
-            #patch_struct_ident {
-                #(#patchable_fields: self.#patchable_fields.clone()),*
+        impl #patch_struct_ident {
+            #vis async fn patch(
+                &self,
+                con: impl sqlx::Executor<'_, Database=sqlx::MySql>,
+                id: &#id_ty,
+            ) -> sqlx::Result<()> {
+                sqlx::query!(
+                    #sql,
+                    #(self.#patchable_fields,)*
+                    id
+                )
+                .execute(con)
+                .await?;
+
+                Ok(())
+            }
+        }
+
+        impl #entity_ident {
+            #vis async fn patch(
+                &mut self,
+                con: impl sqlx::Executor<'_, Database=sqlx::MySql>,
+                update: #patch_struct_ident,
+            ) -> sqlx::Result<()> {
+                #patch_struct_ident::patch(&update, con, &self.#id_ident).await?;
+
+                #(self.#patchable_fields = update.#patchable_fields;)*
+
+                Ok(())
+            }
+
+            #vis fn to_patch(&self) -> #patch_struct_ident {
+                #patch_struct_ident {
+                    #(#patchable_fields: self.#patchable_fields.clone()),*
+                }
             }
         }
     }
