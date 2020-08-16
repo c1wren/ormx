@@ -37,7 +37,7 @@ fn get_all(entity: &Entity) -> TokenStream2 {
         #vis async fn #fn_name(
             con: impl sqlx::Executor<'_, Database=sqlx::MySql>
         ) -> sqlx::Result<Vec<Self>> {
-            sqlx::query_as(Self, #sql)
+            sqlx::query_as!(Self, #sql)
                 .fetch_all(con)
                 .await
         }
