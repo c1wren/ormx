@@ -33,9 +33,9 @@ fn derive_entity(input: DeriveInput) -> Result<TokenStream2> {
             #getters
             #setters
             #update
+            #delete
         }
 
-        #delete
         #insert
         #patch
     })

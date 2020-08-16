@@ -1,29 +1,65 @@
-use crate::Entity;
-use proc_macro2::TokenStream;
+use crate::{Entity, EntityField};
+use proc_macro2::{TokenStream, Ident};
 use quote::quote;
 
 pub fn delete(entity: &Entity) -> TokenStream {
-    let query = format!(
+    let delete = entity
+        .delete
+        .as_ref()
+        .map(|delete_fn| delete_self(entity, delete_fn));
+
+    let delete_by = entity
+        .fields
+        .iter()
+        .flat_map(|field| {
+            field
+                .delete
+                .as_ref()
+                .map(|delete_fn| delete_by(entity, field, delete_fn))
+        })
+        .collect::<TokenStream>();
+
+    quote! {
+        #delete
+        #delete_by
+    }
+}
+
+fn delete_self(entity: &Entity, fn_name: &Ident) -> TokenStream {
+    let vis = &entity.vis;
+    let id_ident = &entity.id.ident;
+    let sql = format!(
         "DELETE FROM {} WHERE {} = ?",
         entity.table_name, entity.id.column_name
     );
-    let pkey_ident = &entity.id.ident;
-    let entity_ident = &entity.ident;
-    let vis = &entity.vis;
 
     quote! {
-        impl #entity_ident {
-            /// Delete a row from the database.
-            #vis async fn delete(
-                self,
-                con: impl sqlx::Executor<'_, Database=sqlx::MySql>
-            ) -> sqlx::Result<()> {
-                sqlx::query!(#query, self.#pkey_ident)
-                    .execute(con)
-                    .await?;
+        #vis async fn #fn_name(
+            self,
+            con: impl sqlx::Executor<'_, Database=sqlx::MySql>,
+        ) -> sqlx::Result<()> {
+            sqlx::query!(#sql, self.#id_ident).execute(con).await?;
+            Ok(())
+        }
+    }
+}
 
-                Ok(())
-            }
+fn delete_by(entity: &Entity, by: &EntityField, fn_name: &Ident) -> TokenStream {
+    let vis = &entity.vis;
+    let by_ty = &by.ty;
+    let sql = format!(
+        "DELETE FROM {} WHERE {} = ?",
+        entity.table_name, by.column_name
+    );
+
+    quote! {
+        #vis async fn #fn_name(
+            con: impl sqlx::Executor<'_, Database=sqlx::MySql>,
+            by: &#by_ty,
+        ) -> sqlx::Result<u64> {
+            use sqlx::Done;
+            let result = sqlx::query!(#sql, by).execute(con).await?;
+            Ok(result.rows_affected())
         }
     }
 }

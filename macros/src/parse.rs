@@ -12,6 +12,7 @@ pub struct EntityField {
     pub get_optional: Option<Ident>,
     pub get_many: Option<Ident>,
     pub set: Option<Ident>,
+    pub delete: Option<Ident>,
     pub column_name: String,
     pub ident: Ident,
     pub ty: Type,
@@ -25,7 +26,7 @@ pub struct EntityField {
 impl EntityField {
     pub fn fmt_for_select(&self) -> String {
         if self.custom_type {
-            return format!("{} AS `{}: _`", self.column_name, self.ident)
+            return format!("{} AS `{}: _`", self.column_name, self.ident);
         }
 
         let ident = self.ident.to_string();
@@ -46,6 +47,7 @@ pub struct Entity {
     pub vis: Visibility,
 
     pub get_all: Option<Ident>,
+    pub delete: Option<Ident>,
 
     pub insert: Option<Ident>,
     pub patch: Option<Ident>,
@@ -98,6 +100,7 @@ impl TryFrom<&Field> for EntityField {
             get_one: None,
             get_optional: None,
             get_many: None,
+            delete: None,
             set: None,
             ty: field.ty.clone(),
             column_name: ident.to_string(),
@@ -105,7 +108,7 @@ impl TryFrom<&Field> for EntityField {
             updatable: true,
             patchable: true,
             generated: false,
-            custom_type: false
+            custom_type: false,
         };
         for attr in crate::attrs::parse_all::<FieldAttr>(&field.attrs)? {
             match attr {
@@ -122,6 +125,10 @@ impl TryFrom<&Field> for EntityField {
                     let fn_name = g.unwrap_or_else(|| get_ident("get_by"));
                     result.get_many = Some(fn_name);
                 }
+                FieldAttr::Delete(g) => {
+                    let fn_name = g.unwrap_or_else(|| get_ident("delete_by"));
+                    result.delete = Some(fn_name)
+                }
                 FieldAttr::Set(s) => {
                     let fn_name = s.unwrap_or_else(|| get_ident("set"));
                     result.set = Some(fn_name);
@@ -131,7 +138,7 @@ impl TryFrom<&Field> for EntityField {
                 FieldAttr::Generated => {
                     result.generated = true;
                     result.patchable = false;
-                },
+                }
                 FieldAttr::CustomType => {
                     result.custom_type = true;
                 }
@@ -162,6 +169,7 @@ impl TryFrom<DeriveInput> for Entity {
         let mut insert = None;
         let mut patch = None;
         let mut get_all = None;
+        let mut delete = None;
         for attr in crate::attrs::parse_all::<EntityAttr>(&input.attrs)? {
             match attr {
                 EntityAttr::Table(name) => table_name.replace(name).map_or(Ok(()), duplicate)?,
@@ -178,10 +186,13 @@ impl TryFrom<DeriveInput> for Entity {
                     });
                     patch.replace(struct_ident).map_or(Ok(()), duplicate)?
                 }
-                EntityAttr::GetAll(fn_ident) => {
-                    let fn_ident =
-                        fn_ident.unwrap_or_else(|| Ident::new("get_all", Span::call_site()));
-                    get_all.replace(fn_ident).map_or(Ok(()), duplicate)?
+                EntityAttr::GetAll(fun) => {
+                    let fun = fun.unwrap_or_else(|| Ident::new("get_all", Span::call_site()));
+                    get_all.replace(fun).map_or(Ok(()), duplicate)?
+                }
+                EntityAttr::Deletable(fun) => {
+                    let fun = fun.unwrap_or_else(|| Ident::new("delete", Span::call_site()));
+                    delete.replace(fun).map_or(Ok(()), duplicate)?
                 }
             }
         }
@@ -206,6 +217,7 @@ impl TryFrom<DeriveInput> for Entity {
             insert,
             patch,
             get_all,
+            delete,
         })
     }
 }

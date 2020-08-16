@@ -9,10 +9,11 @@ async fn main() -> anyhow::Result<()> {
     table = "clubs",
     id = club_id,
     insertable,
-    patchable
+    patchable,
+    deletable
 )]
 struct Club {
-    #[ormx(get_one = by_id)]
+    #[ormx(get_one = by_id, delete = delete_by_id)]
     club_id: u32,
     #[ormx(
         get_optional = by_name,
