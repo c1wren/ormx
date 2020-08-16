@@ -9,11 +9,12 @@ pub fn delete(entity: &Entity) -> TokenStream {
     );
     let pkey_ident = &entity.id.ident;
     let entity_ident = &entity.ident;
+    let vis = &entity.vis;
 
     quote! {
         impl #entity_ident {
             /// Delete a row from the database.
-            pub async fn delete(
+            #vis async fn delete(
                 self,
                 con: impl sqlx::Executor<'_, Database=sqlx::MySql>
             ) -> sqlx::Result<()> {

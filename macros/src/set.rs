@@ -20,9 +20,10 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
     let field_ty = &field.ty;
     let field_ident = &field.ident;
     let pkey = &entity.id.ident;
+    let vis = &entity.vis;
 
     quote! {
-        pub async fn #fn_name(
+        #vis async fn #fn_name(
             &mut self,
             con: impl sqlx::Executor<'_, Database=sqlx::MySql>,
             value: #field_ty
