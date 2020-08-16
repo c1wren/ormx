@@ -1,4 +1,4 @@
-use crate::Entity;
+use crate::{Entity, EntityField};
 use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -25,7 +25,9 @@ pub fn patch(entity: &Entity) -> TokenStream {
 
 fn patch_struct(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
     let vis = &entity.vis;
-    let fields = entity.patchable_fields();
+    let fields = entity
+        .patchable_fields()
+        .map(|EntityField { ident, ty, .. }| quote!(#vis #ident: #ty));
 
     quote! {
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]

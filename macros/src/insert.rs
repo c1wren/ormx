@@ -1,6 +1,6 @@
 use crate::{Entity, EntityField};
 use itertools::Itertools;
-use proc_macro2::{TokenStream};
+use proc_macro2::TokenStream;
 use quote::quote;
 use std::iter::repeat;
 
@@ -10,8 +10,10 @@ pub fn insert(entity: &Entity) -> TokenStream {
         None => return quote!(),
     };
 
-    let fields = entity.insertable_fields();
     let vis = &entity.vis;
+    let fields = entity
+        .insertable_fields()
+        .map(|EntityField { ident, ty, .. }| quote!(#vis #ident: #ty));
     let insert_fn = insert_fn(entity);
 
     quote! {

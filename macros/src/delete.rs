@@ -1,5 +1,5 @@
 use crate::{Entity, EntityField};
-use proc_macro2::{TokenStream, Ident};
+use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 
 pub fn delete(entity: &Entity) -> TokenStream {

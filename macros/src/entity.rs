@@ -1,7 +1,5 @@
 use crate::attrs::{EntityAttr, FieldAttr};
-use proc_macro2::{Span, TokenStream};
-use quote::quote;
-use quote::ToTokens;
+use proc_macro2::Span;
 use std::convert::TryFrom;
 use syn::spanned::Spanned;
 use syn::*;
@@ -58,7 +56,7 @@ impl Entity {
         let id = self.id.ident.clone();
         self.fields
             .iter()
-            .filter(move |field| !(&id == &field.ident || field.generated))
+            .filter(move |field| !(id == field.ident || field.generated))
     }
 
     pub fn generated_fields(&self) -> impl Iterator<Item = &EntityField> {
@@ -69,22 +67,14 @@ impl Entity {
         let id = self.id.ident.clone();
         self.fields
             .iter()
-            .filter(move |field| &field.ident != &id && field.patchable)
+            .filter(move |field| field.ident != id && field.patchable)
     }
 
     pub fn updatable_fields(&self) -> impl Iterator<Item = &EntityField> {
         let id = self.id.ident.clone();
         self.fields
             .iter()
-            .filter(move |field| &field.ident != &id && field.updatable)
-    }
-}
-
-impl ToTokens for EntityField {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let ident = &self.ident;
-        let ty = &self.ty;
-        tokens.extend(quote!(pub #ident: #ty));
+            .filter(move |field| field.ident != id && field.updatable)
     }
 }
 
@@ -225,12 +215,10 @@ impl TryFrom<DeriveInput> for Entity {
 fn get_fields(span: Span, input: &DataStruct) -> Result<Vec<&Field>> {
     match &input.fields {
         Fields::Named(FieldsNamed { named, .. }) => Ok(named.iter().collect()),
-        _ => {
-            return Err(Error::new(
-                span,
-                "only structs with named fields can be used as entity",
-            ))
-        }
+        _ => Err(Error::new(
+            span,
+            "only structs with named fields can be used as entity",
+        )),
     }
 }
 

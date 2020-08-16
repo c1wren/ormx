@@ -1,20 +1,19 @@
 extern crate proc_macro;
 
-use proc_macro2::{TokenStream as TokenStream2};
+use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use std::convert::TryFrom;
 use syn::*;
 
-pub(crate) use parse::{Entity, EntityField};
+pub(crate) use entity::{Entity, EntityField};
 
+mod attrs;
 mod delete;
+mod entity;
 mod get;
 mod insert;
-mod parse;
-mod set;
 mod patch;
-mod utils;
-mod attrs;
+mod set;
 mod update;
 
 fn derive_entity(input: DeriveInput) -> Result<TokenStream2> {

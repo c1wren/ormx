@@ -106,10 +106,7 @@ fn many(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     }
 }
 
-fn build_query(
-    entity: &Entity,
-    by: Option<&EntityField>,
-) -> String {
+fn build_query(entity: &Entity, by: Option<&EntityField>) -> String {
     let columns = entity
         .fields
         .iter()
@@ -122,9 +119,6 @@ fn build_query(
             columns, entity.table_name, by.column_name
         )
     } else {
-        format!(
-            "SELECT {} FROM {}",
-            columns, entity.table_name
-        )
+        format!("SELECT {} FROM {}", columns, entity.table_name)
     }
 }

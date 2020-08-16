@@ -14,21 +14,24 @@ pub enum EntityAttr {
 
 impl Parse for EntityAttr {
     fn parse(input: ParseStream) -> Result<Self> {
+        use EntityAttr::*;
+
         let ident = input.parse::<Ident>()?;
-        match &*ident.to_string() {
-            "table" => parse_assign::<LitStr>(ident.span(), &input)
-                .map(|lit| lit.value())
-                .map(Self::Table),
-            "id" => parse_assign::<Ident>(ident.span(), &input).map(Self::Id),
-            "insertable" => parse_optional_assign::<Ident>(&input).map(Self::Insertable),
-            "patchable" => parse_optional_assign::<Ident>(&input).map(Self::Patchable),
-            "deletable" => parse_optional_assign::<Ident>(&input).map(Self::Deletable),
-            "get_all" => parse_optional_assign::<Ident>(&input).map(Self::GetAll),
-            other => Err(Error::new(
-                ident.span(),
-                &format!("unknown ormx attribute: `{}`", other),
-            )),
-        }
+        let attr = match &*ident.to_string() {
+            "table" => Table(assign_string(ident.span(), &input)?),
+            "id" => Id(assign(ident.span(), &input)?),
+            "insertable" => Insertable(opt_assign(&input)?),
+            "patchable" => Patchable(opt_assign(&input)?),
+            "deletable" => Deletable(opt_assign(&input)?),
+            "get_all" => GetAll(opt_assign(&input)?),
+            other => {
+                return Err(Error::new(
+                    ident.span(),
+                    &format!("unknown ormx attribute: `{}`", other),
+                ))
+            }
+        };
+        Ok(attr)
     }
 }
 
@@ -47,33 +50,28 @@ pub enum FieldAttr {
 
 impl Parse for FieldAttr {
     fn parse(input: ParseStream) -> Result<Self> {
+        use FieldAttr::*;
+
         let ident = input.parse::<Ident>()?;
-        match &*ident.to_string() {
-            "rename" => parse_assign::<LitStr>(ident.span(), &input)
-                .map(|lit| lit.value())
-                .map(Self::Rename),
-            "set" => parse_optional_assign::<Ident>(&input).map(Self::Set),
-            "get_one" => parse_optional_assign::<Ident>(&input).map(Self::GetOne),
-            "get_optional" => parse_optional_assign::<Ident>(&input).map(Self::GetOptional),
-            "get_many" => parse_optional_assign::<Ident>(&input).map(Self::GetMany),
-            "delete" => parse_optional_assign::<Ident>(&input).map(Self::Delete),
-            "generated" => Ok(Self::Generated),
-            "custom_type" => Ok(Self::CustomType),
-            "patchable" => Ok(Self::Patchable(
-                parse_optional_assign::<LitBool>(&input)?
-                    .map(|lit| lit.value)
-                    .unwrap_or(true),
-            )),
-            "updatable" => Ok(Self::Updatable(
-                parse_optional_assign::<LitBool>(&input)?
-                    .map(|lit| lit.value)
-                    .unwrap_or(true),
-            )),
-            other => Err(Error::new(
-                ident.span(),
-                &format!("unknown ormx attribute: `{}`", other),
-            )),
-        }
+        let attr = match &*ident.to_string() {
+            "rename" => Rename(assign_string(ident.span(), &input)?),
+            "set" => Set(opt_assign(&input)?),
+            "get_one" => GetOne(opt_assign(&input)?),
+            "get_optional" => GetOptional(opt_assign(&input)?),
+            "get_many" => GetMany(opt_assign(&input)?),
+            "delete" => Delete(opt_assign(&input)?),
+            "generated" => Generated,
+            "custom_type" => CustomType,
+            "patchable" => Patchable(opt_assign_bool(&input)?.unwrap_or(true)),
+            "updatable" => Updatable(opt_assign_bool(&input)?.unwrap_or(true)),
+            other => {
+                return Err(Error::new(
+                    ident.span(),
+                    &format!("unknown ormx attribute: `{}`", other),
+                ))
+            }
+        };
+        Ok(attr)
     }
 }
 
@@ -90,15 +88,24 @@ pub fn parse_all<P: Parse>(attrs: &[Attribute]) -> Result<Vec<P>> {
     Ok(all)
 }
 
-fn parse_assign<V: Parse>(span: Span, input: &ParseStream) -> Result<V> {
-    parse_optional_assign(&input)?.ok_or_else(|| Error::new(span, "missing value"))
+fn assign<V: Parse>(span: Span, input: &ParseStream) -> Result<V> {
+    opt_assign(&input)?.ok_or_else(|| Error::new(span, "missing value"))
 }
 
-fn parse_optional_assign<V: Parse>(input: &ParseStream) -> Result<Option<V>> {
+fn opt_assign<V: Parse>(input: &ParseStream) -> Result<Option<V>> {
     Ok(if input.peek(Token![=]) {
         input.parse::<Token![=]>()?;
         Some(input.parse()?)
     } else {
         None
     })
+}
+
+fn opt_assign_bool(input: &ParseStream) -> Result<Option<bool>> {
+    let parsed = opt_assign::<LitBool>(&input)?.map(|lit| lit.value);
+    Ok(parsed)
+}
+
+fn assign_string(span: Span, input: &ParseStream) -> Result<String> {
+    assign::<LitStr>(span, input).map(|lit| lit.value())
 }
