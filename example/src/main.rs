@@ -1,7 +1,11 @@
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
-    let patch = PatchClub::default().set_name("Hello".into());
+    let patch = PatchClub::default()
+        .set_name("Hello".into())
+        .set_test1("World".into())
+        .set_test3(Some(false));
+
     Ok(())
 }
 

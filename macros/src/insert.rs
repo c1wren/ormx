@@ -2,7 +2,6 @@ use crate::{Entity, EntityField};
 use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::quote;
-use std::iter::repeat;
 
 pub fn insert(entity: &Entity) -> TokenStream {
     let struct_ident = match &entity.insert {

@@ -1,5 +1,4 @@
 use crate::{Entity, EntityField};
-use itertools::Itertools;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::Ident;
