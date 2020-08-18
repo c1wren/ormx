@@ -44,7 +44,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         entity
             .patchable_fields()
             .enumerate()
-            .map(|index, field| format!("{} = {}", field.column_name, index + 2))
+            .map(|(index, field)| format!("{} = {}", field.column_name, index + 2))
             .join(","),
         entity.id.column_name
     );
