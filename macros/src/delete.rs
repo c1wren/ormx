@@ -29,7 +29,7 @@ fn delete_self(entity: &Entity, fn_name: &Ident) -> TokenStream {
     let vis = &entity.vis;
     let id_ident = &entity.id.ident;
     let sql = format!(
-        "DELETE FROM {} WHERE {} = ?",
+        "DELETE FROM {} WHERE {} = $1",
         entity.table_name, entity.id.column_name
     );
 
@@ -48,7 +48,7 @@ fn delete_by(entity: &Entity, by: &EntityField, fn_name: &Ident) -> TokenStream 
     let vis = &entity.vis;
     let by_ty = &by.ty;
     let sql = format!(
-        "DELETE FROM {} WHERE {} = ?",
+        "DELETE FROM {} WHERE {} = $1",
         entity.table_name, by.column_name
     );
 

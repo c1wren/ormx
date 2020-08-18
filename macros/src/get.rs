@@ -115,7 +115,7 @@ fn build_query(entity: &Entity, by: Option<&EntityField>) -> String {
 
     if let Some(by) = by {
         format!(
-            "SELECT {} FROM {} WHERE {} = ?",
+            "SELECT {} FROM {} WHERE {} = $1",
             columns, entity.table_name, by.column_name
         )
     } else {

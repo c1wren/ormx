@@ -5,11 +5,11 @@ use quote::quote;
 
 pub fn update(entity: &Entity) -> TokenStream {
     let sql = format!(
-        "UPDATE {} SET {} WHERE {} = ?",
+        "UPDATE {} SET {} WHERE {} = $1",
         entity.table_name,
         entity
             .updatable_fields()
-            .map(|field| format!("{} = ?", field.column_name))
+            .map(|field| format!("{} = $1", field.column_name))
             .join(","),
         entity.id.column_name
     );

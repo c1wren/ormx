@@ -84,13 +84,13 @@ fn insert_sql(entity: &Entity) -> String {
         "INSERT INTO {} ({}) VALUES ({})",
         entity.table_name,
         insertable.iter().map(|field| &field.column_name).join(","),
-        repeat("?").take(insertable.len()).join(",")
+        (1..=insertable.len()).map(|i| format!("${}", i)).join(",")
     )
 }
 
 fn query_generated_sql(entity: &Entity) -> String {
     format!(
-        "SELECT {} FROM {} WHERE {} = ?",
+        "SELECT {} FROM {} WHERE {} = $1",
         entity
             .generated_fields()
             .map(EntityField::fmt_for_select)

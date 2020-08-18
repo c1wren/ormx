@@ -39,11 +39,11 @@ fn patch_struct(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
 
 fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
     let sql = format!(
-        "UPDATE {} SET {} WHERE {} = ?",
+        "UPDATE {} SET {} WHERE {} = $1",
         entity.table_name,
         entity
             .patchable_fields()
-            .map(|field| format!("{} = ?", field.column_name))
+            .map(|field| format!("{} = $1", field.column_name))
             .join(","),
         entity.id.column_name
     );
