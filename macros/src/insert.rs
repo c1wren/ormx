@@ -61,7 +61,7 @@ fn insert_fn(entity: &Entity) -> TokenStream {
             let mut tx = __con.begin().await?;
 
             let rec = sqlx::query!(#insert_sql, #(self.#insertable_idents),*)
-                .execute(&mut tx)
+                .fetch_one(&mut tx)
                 .await?;
 
             #query_generated

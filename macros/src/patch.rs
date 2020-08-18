@@ -1,6 +1,6 @@
 use crate::{Entity, EntityField};
 use itertools::Itertools;
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::Ident;
 
@@ -27,27 +27,31 @@ fn patch_struct(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
     let vis = &entity.vis;
     let fields = entity
         .patchable_fields()
-        .map(|EntityField { ident, ty, .. }| quote!(#vis #ident: #ty));
+        .map(|EntityField { ident, ty, .. }| quote!(#vis #ident: Option<#ty>));
+
+    let setters = entity
+        .patchable_fields()
+        .map(|EntityField { ident, ty, .. }| {
+            let setter = Ident::new(&format!("set_{}", ident), Span::call_site());
+            quote!(fn #setter(mut self, value: #ty) -> Self {
+                self.#ident = Some(value);
+                self
+            })
+        });
 
     quote! {
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[derive(Default, Clone, Debug, serde::Serialize, serde::Deserialize)]
         #vis struct #patch_struct_ident {
             #(#fields),*
+        }
+
+        impl #patch_struct_ident {
+            #(#setters)*
         }
     }
 }
 
 fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
-    let sql = format!(
-        "UPDATE {} SET {} WHERE {} = $1",
-        entity.table_name,
-        entity
-            .patchable_fields()
-            .enumerate()
-            .map(|(index, field)| format!("{} = {}", field.column_name, index + 2))
-            .join(","),
-        entity.id.column_name
-    );
     let patchable_fields = entity
         .patchable_fields()
         .map(|field| &field.ident)
@@ -55,7 +59,27 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
     let id_ty = &entity.id.ty;
     let id_ident = &entity.id.ident;
     let entity_ident = &entity.ident;
+    let table_name = &entity.table_name;
     let vis = &entity.vis;
+
+    let column_building = entity.patchable_fields().map(|field| {
+        let ident = &field.ident;
+        quote!(
+            if self.#ident.is_some() {
+                columns.push(format!("{} = ${}", stringify!(#ident), count));
+                count += 1;
+            }
+        )
+    });
+
+    let binding = entity.patchable_fields().map(|field| {
+        let ident = &field.ident;
+        quote!(
+            if let Some(value) = self.#ident.as_ref() {
+                query = query.bind(1)
+            }
+        )
+    });
 
     quote! {
         impl #patch_struct_ident {
@@ -64,13 +88,19 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
                 con: impl sqlx::Executor<'_, Database=sqlx::Postgres>,
                 id: &#id_ty,
             ) -> sqlx::Result<()> {
-                sqlx::query!(
-                    #sql,
-                    #(self.#patchable_fields,)*
-                    id
-                )
-                .execute(con)
-                .await?;
+                let mut columns = vec![];
+                let mut count = 2;
+
+                #(#column_building)*
+
+                let columns = columns.join(", ");
+
+                let sql = format!("UPDATE {} SET {} WHERE id = $1", #table_name, columns);
+
+                let mut query = sqlx::query(&sql).bind(id);
+                #(#binding)*
+
+                query.execute(con).await?;
 
                 Ok(())
             }
@@ -84,15 +114,11 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
             ) -> sqlx::Result<()> {
                 #patch_struct_ident::patch(&update, con, &self.#id_ident).await?;
 
-                #(self.#patchable_fields = update.#patchable_fields;)*
+                #(if let Some(new_value) = update.#patchable_fields {
+                    self.#patchable_fields = new_value;
+                })*
 
                 Ok(())
-            }
-
-            #vis fn to_patch(&self) -> #patch_struct_ident {
-                #patch_struct_ident {
-                    #(#patchable_fields: self.#patchable_fields.clone()),*
-                }
             }
         }
     }

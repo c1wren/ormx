@@ -10,7 +10,7 @@ pub fn update(entity: &Entity) -> TokenStream {
         entity
             .updatable_fields()
             .enumerate()
-            .map(|(index, field)| format!("{} = {}", field.column_name, index + 2))
+            .map(|(index, field)| format!("{} = ${}", field.column_name, index + 2))
             .join(","),
         entity.id.column_name
     );
@@ -24,7 +24,7 @@ pub fn update(entity: &Entity) -> TokenStream {
             &self,
             con: impl sqlx::Executor<'_, Database=sqlx::Postgres>
         ) -> sqlx::Result<()> {
-            sqlx::query!(#sql, #(self.#updatable_fields,)* self.#id_ident).execute(con).await?;
+            sqlx::query!(#sql, self.#id_ident, #(self.#updatable_fields,)*).execute(con).await?;
             Ok(())
         }
     }
