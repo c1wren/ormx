@@ -13,7 +13,7 @@ pub fn setters(entity: &Entity) -> TokenStream2 {
 
 fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     let query = format!(
-        "UPDATE {} SET {} = $1 WHERE {} = $1",
+        "UPDATE {} SET {} = $1 WHERE {} = $2",
         entity.table_name, field.column_name, entity.id.column_name
     );
 
