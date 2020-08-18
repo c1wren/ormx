@@ -42,7 +42,7 @@ fn insert_fn(entity: &Entity) -> TokenStream {
         quote!()
     } else {
         let sql = query_generated_sql(entity);
-        quote!(let generated = sqlx::query!(#sql, last_insert_id).fetch_one(&mut tx).await?;)
+        quote!(let generated = sqlx::query!(#sql, rec.id).fetch_one(&mut tx).await?;)
     };
 
     let vis = &entity.vis;
@@ -60,17 +60,16 @@ fn insert_fn(entity: &Entity) -> TokenStream {
             use sqlx::Connection;
             let mut tx = __con.begin().await?;
 
-            let last_insert_id = sqlx::query!(#insert_sql, #(self.#insertable_idents),*)
+            let rec = sqlx::query!(#insert_sql, #(self.#insertable_idents),*)
                 .execute(&mut tx)
-                .await?
-                .last_insert_id();
+                .await?;
 
             #query_generated
 
             tx.commit().await?;
 
             Ok(#entity_ident {
-                #id_ident: last_insert_id as _,
+                #id_ident: rec.id as _,
                 #(#insertable_idents: self.#insertable_idents,)*
                 #(#generated_idents: generated.#generated_idents),*
             })
@@ -81,7 +80,7 @@ fn insert_fn(entity: &Entity) -> TokenStream {
 fn insert_sql(entity: &Entity) -> String {
     let insertable = entity.insertable_fields().collect::<Vec<_>>();
     format!(
-        "INSERT INTO {} ({}) VALUES ({})",
+        "INSERT INTO {} ({}) VALUES ({}) RETURNING id",
         entity.table_name,
         insertable.iter().map(|field| &field.column_name).join(","),
         (1..=insertable.len()).map(|i| format!("${}", i)).join(",")
