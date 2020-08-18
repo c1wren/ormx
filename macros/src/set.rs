@@ -25,7 +25,7 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
     quote! {
         #vis async fn #fn_name(
             &mut self,
-            con: impl sqlx::Executor<'_, Database=sqlx::MySql>,
+            con: impl sqlx::Executor<'_, Database=sqlx::Postgres>,
             value: #field_ty
         ) -> sqlx::Result<()> {
             sqlx::query!(#query, value, &self.#pkey)

@@ -36,7 +36,7 @@ fn delete_self(entity: &Entity, fn_name: &Ident) -> TokenStream {
     quote! {
         #vis async fn #fn_name(
             self,
-            con: impl sqlx::Executor<'_, Database=sqlx::MySql>,
+            con: impl sqlx::Executor<'_, Database=sqlx::Postgres>,
         ) -> sqlx::Result<()> {
             sqlx::query!(#sql, self.#id_ident).execute(con).await?;
             Ok(())
@@ -54,7 +54,7 @@ fn delete_by(entity: &Entity, by: &EntityField, fn_name: &Ident) -> TokenStream 
 
     quote! {
         #vis async fn #fn_name(
-            con: impl sqlx::Executor<'_, Database=sqlx::MySql>,
+            con: impl sqlx::Executor<'_, Database=sqlx::Postgres>,
             by: &#by_ty,
         ) -> sqlx::Result<u64> {
             use sqlx::Done;

@@ -21,7 +21,7 @@ pub fn update(entity: &Entity) -> TokenStream {
     quote! {
         #vis async fn update(
             &self,
-            con: impl sqlx::Executor<'_, Database=sqlx::MySql>
+            con: impl sqlx::Executor<'_, Database=sqlx::Postgres>
         ) -> sqlx::Result<()> {
             sqlx::query!(#sql, #(self.#updatable_fields,)* self.#id_ident).execute(con).await?;
             Ok(())

@@ -46,7 +46,7 @@ fn get_all(entity: &Entity) -> TokenStream2 {
 
     quote! {
         #vis async fn #fn_name(
-            con: impl sqlx::Executor<'_, Database=sqlx::MySql>
+            con: impl sqlx::Executor<'_, Database=sqlx::Postgres>
         ) -> sqlx::Result<Vec<Self>> {
             sqlx::query_as!(Self, #sql)
                 .fetch_all(con)
@@ -62,7 +62,7 @@ fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
 
     quote! {
         #vis async fn #fn_name(
-            con: impl sqlx::Executor<'_, Database=sqlx::MySql>,
+            con: impl sqlx::Executor<'_, Database=sqlx::Postgres>,
             by: &#by
         ) -> sqlx::Result<Self> {
             sqlx::query_as!(Self, #query, by)
@@ -79,7 +79,7 @@ fn optional(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStrea
 
     quote! {
         #vis async fn #fn_name(
-            con: impl sqlx::Executor<'_, Database=sqlx::MySql>,
+            con: impl sqlx::Executor<'_, Database=sqlx::Postgres>,
             by: &#by
         ) -> sqlx::Result<Option<Self>> {
             sqlx::query_as!(Self, #query, by)
@@ -96,7 +96,7 @@ fn many(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
 
     quote! {
         #vis async fn #fn_name(
-            con: impl sqlx::Executor<'_, Database=sqlx::MySql>,
+            con: impl sqlx::Executor<'_, Database=sqlx::Postgres>,
             by: #by
         ) -> sqlx::Result<Vec<Self>> {
             sqlx::query_as!(Self, #query, by)

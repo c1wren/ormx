@@ -55,7 +55,7 @@ fn insert_fn(entity: &Entity) -> TokenStream {
         /// Insert a row into the database.
         #vis async fn insert(
             self,
-            __con: &mut sqlx::MySqlConnection,
+            __con: &mut sqlx::PgConnection,
         ) -> sqlx::Result<#entity_ident> {
             use sqlx::Connection;
             let mut tx = __con.begin().await?;

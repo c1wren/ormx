@@ -60,7 +60,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         impl #patch_struct_ident {
             #vis async fn patch(
                 &self,
-                con: impl sqlx::Executor<'_, Database=sqlx::MySql>,
+                con: impl sqlx::Executor<'_, Database=sqlx::Postgres>,
                 id: &#id_ty,
             ) -> sqlx::Result<()> {
                 sqlx::query!(
@@ -78,7 +78,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         impl #entity_ident {
             #vis async fn patch(
                 &mut self,
-                con: impl sqlx::Executor<'_, Database=sqlx::MySql>,
+                con: impl sqlx::Executor<'_, Database=sqlx::Postgres>,
                 update: #patch_struct_ident,
             ) -> sqlx::Result<()> {
                 #patch_struct_ident::patch(&update, con, &self.#id_ident).await?;
