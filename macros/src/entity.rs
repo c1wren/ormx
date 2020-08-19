@@ -28,7 +28,7 @@ impl EntityField {
             return format!(r#"{} AS "{}: _""#, self.column_name, self.ident);
         }
 
-        let ident = self.ident.to_string();
+        let ident = self.ident.to_string().replace("r#", "");
 
         if ident == self.column_name {
             ident

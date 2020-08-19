@@ -17,6 +17,7 @@ async fn main() -> Result<()> {
         test2: TestEnum::Test2,
         test3: Some(false),
         test4: Some(vec![1, 2, 3, 4]),
+        r#type: 3,
     }
     .insert(&db_pool)
     .await?;
@@ -78,6 +79,8 @@ struct Club {
     test3: Option<bool>,
     #[ormx(convert = "my_convert")]
     test4: Option<Vec<i32>>,
+    #[ormx(set = "set_type", rename = "type")]
+    r#type: i32,
 }
 
 #[allow(unused)]
