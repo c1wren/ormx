@@ -21,7 +21,7 @@ async fn main() -> Result<()> {
     }
     .insert(&db_pool)
     .await?;
-    dbg!("first", &club);
+    dbg!(&club);
 
     let patch = PatchClub::default().set_name("New Name".into());
     club.patch(&db_pool, patch).await?;
