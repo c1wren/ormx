@@ -1,4 +1,4 @@
-use crate::{Entity, EntityField};
+use crate::{attrs::ConvertType, Entity, EntityField};
 use itertools::Itertools;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
@@ -60,10 +60,10 @@ fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
     let vis = &entity.vis;
     let query = build_query(entity, Some(field));
 
-    let by_converter = if let Some(convert_fn) = &field.convert {
-        quote! { #convert_fn(&by) }
-    } else {
-        quote! { by }
+    let by_converter = match &field.convert {
+        Some(ConvertType::As(t)) => quote! { *by as #t },
+        Some(ConvertType::Function(convert_fn)) => quote! { #convert_fn(&by) },
+        None => quote! { by },
     };
 
     quote! {
@@ -83,10 +83,10 @@ fn optional(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStrea
     let vis = &entity.vis;
     let query = build_query(entity, Some(field));
 
-    let by_converter = if let Some(convert_fn) = &field.convert {
-        quote! { #convert_fn(&by) }
-    } else {
-        quote! { by }
+    let by_converter = match &field.convert {
+        Some(ConvertType::As(t)) => quote! { *by as #t },
+        Some(ConvertType::Function(convert_fn)) => quote! { #convert_fn(&by) },
+        None => quote! { by },
     };
 
     quote! {
@@ -106,10 +106,10 @@ fn many(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     let vis = &entity.vis;
     let query = build_query(entity, Some(field));
 
-    let by_converter = if let Some(convert_fn) = &field.convert {
-        quote! { #convert_fn(&by) }
-    } else {
-        quote! { by }
+    let by_converter = match &field.convert {
+        Some(ConvertType::As(t)) => quote! { *by as #t },
+        Some(ConvertType::Function(convert_fn)) => quote! { #convert_fn(&by) },
+        None => quote! { by },
     };
 
     quote! {

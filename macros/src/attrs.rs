@@ -44,9 +44,15 @@ pub enum FieldAttr {
     Set(Option<Ident>),
     Updatable(bool),
     Patchable(bool),
-    Convert(ExprPath),
+    Convert(ConvertType),
     Generated,
     CustomType,
+}
+
+#[derive(Clone)]
+pub enum ConvertType {
+    Function(ExprPath),
+    As(Ident),
 }
 
 impl Parse for FieldAttr {
@@ -65,7 +71,11 @@ impl Parse for FieldAttr {
             "custom_type" => CustomType,
             "patchable" => Patchable(opt_assign_bool(&input)?.unwrap_or(true)),
             "updatable" => Updatable(opt_assign_bool(&input)?.unwrap_or(true)),
-            "convert" => Convert(assign_expr_path(ident.span(), &input)?),
+            "convert" => Convert(ConvertType::Function(assign_expr_path(
+                ident.span(),
+                &input,
+            )?)),
+            "convert_as" => Convert(ConvertType::As(assign_ident(ident.span(), &input)?)),
             other => {
                 return Err(Error::new(
                     ident.span(),

@@ -1,4 +1,4 @@
-use crate::{Entity, EntityField};
+use crate::{attrs::ConvertType, Entity, EntityField};
 use proc_macro2::Ident;
 use quote::quote;
 use syn::export::TokenStream2;
@@ -22,10 +22,10 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
     let pkey = &entity.id.ident;
     let vis = &entity.vis;
 
-    let value_converter = if let Some(convert_fn) = &field.convert {
-        quote! { #convert_fn(&value) }
-    } else {
-        quote! { value }
+    let value_converter = match &field.convert {
+        Some(ConvertType::As(t)) => quote! { value as #t },
+        Some(ConvertType::Function(convert_fn)) => quote! { #convert_fn(&value) },
+        None => quote! { value },
     };
 
     quote! {

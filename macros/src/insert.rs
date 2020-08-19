@@ -1,4 +1,4 @@
-use crate::{Entity, EntityField};
+use crate::{attrs::ConvertType, Entity, EntityField};
 use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -37,10 +37,10 @@ fn insert_fn(entity: &Entity) -> TokenStream {
         .insertable_fields()
         .map(|field| {
             let ident = &field.ident;
-            if let Some(convert_fn) = &field.convert {
-                quote! { #convert_fn(&self.#ident) }
-            } else {
-                quote! { self.#ident }
+            match &field.convert {
+                Some(ConvertType::As(t)) => quote! { self.#ident as #t },
+                Some(ConvertType::Function(convert_fn)) => quote! { #convert_fn(&self.#ident) },
+                None => quote! { self.#ident },
             }
         })
         .collect::<Vec<_>>();
@@ -66,18 +66,13 @@ fn insert_fn(entity: &Entity) -> TokenStream {
         /// Insert a row into the database.
         #vis async fn insert(
             self,
-            __con: &mut PgPool,
+            con: impl sqlx::Executor<'_, Database=sqlx::Postgres>,
         ) -> sqlx::Result<#entity_ident> {
-            use sqlx::Connection;
-            let mut tx = __con.begin().await?;
-
-            let rec = sqlx::query!(#insert_sql, #(#query_idents),*)
-                .fetch_one(&mut tx)
+            let rec = sqlx::query_as!(#entity_ident, #insert_sql, #(#query_idents),*)
+                .fetch_one(con)
                 .await?;
 
             #query_generated
-
-            tx.commit().await?;
 
             Ok(#entity_ident {
                 #id_ident: rec.id as _,
@@ -89,12 +84,19 @@ fn insert_fn(entity: &Entity) -> TokenStream {
 }
 
 fn insert_sql(entity: &Entity) -> String {
+    let columns = entity
+        .fields
+        .iter()
+        .map(EntityField::fmt_for_select)
+        .join(", ");
+
     let insertable = entity.insertable_fields().collect::<Vec<_>>();
     format!(
-        "INSERT INTO {} ({}) VALUES ({}) RETURNING id",
+        "INSERT INTO {} ({}) VALUES ({}) RETURNING {}",
         entity.table_name,
         insertable.iter().map(|field| &field.column_name).join(","),
-        (1..=insertable.len()).map(|i| format!("${}", i)).join(",")
+        (1..=insertable.len()).map(|i| format!("${}", i)).join(","),
+        columns
     )
 }
 

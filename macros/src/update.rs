@@ -1,4 +1,4 @@
-use crate::Entity;
+use crate::{attrs::ConvertType, Entity};
 use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -20,10 +20,10 @@ pub fn update(entity: &Entity) -> TokenStream {
 
     let updatable_fields = entity.updatable_fields().map(|field| {
         let ident = &field.ident;
-        if let Some(convert_fn) = &field.convert {
-            quote! { #convert_fn(&self.#ident) }
-        } else {
-            quote! { self.#ident }
+        match &field.convert {
+            Some(ConvertType::As(t)) => quote! { self.#ident as #t },
+            Some(ConvertType::Function(convert_fn)) => quote! { #convert_fn(&self.#ident) },
+            None => quote! { self.#ident },
         }
     });
 

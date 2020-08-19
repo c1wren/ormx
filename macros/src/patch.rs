@@ -1,4 +1,4 @@
-use crate::{Entity, EntityField};
+use crate::{attrs::ConvertType, Entity, EntityField};
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::Ident;
@@ -75,11 +75,12 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
 
     let binding = entity.patchable_fields().map(|field| {
         let ident = &field.ident;
-        let value_getter = if let Some(convert_fn) = &field.convert {
-            quote! { #convert_fn(value) }
-        } else {
-            quote! { value }
+        let value_getter = match &field.convert {
+            Some(ConvertType::As(t)) => quote! { *value as #t },
+            Some(ConvertType::Function(convert_fn)) => quote! { #convert_fn(&value) },
+            None => quote! { value },
         };
+
         quote!(
             if let Some(value) = self.#ident.as_ref() {
                 query = query.bind(#value_getter)

@@ -1,4 +1,4 @@
-use crate::attrs::{EntityAttr, FieldAttr};
+use crate::attrs::{ConvertType, EntityAttr, FieldAttr};
 use proc_macro2::Span;
 use std::convert::TryFrom;
 use syn::spanned::Spanned;
@@ -11,7 +11,7 @@ pub struct EntityField {
     pub get_many: Option<Ident>,
     pub set: Option<Ident>,
     pub delete: Option<Ident>,
-    pub convert: Option<ExprPath>,
+    pub convert: Option<ConvertType>,
     pub column_name: String,
     pub ident: Ident,
     pub ty: Type,
