@@ -73,9 +73,14 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
 
     let binding = entity.patchable_fields().map(|field| {
         let ident = &field.ident;
+        let value_getter = if let Some(convert_fn) = &field.convert {
+            quote! { #convert_fn(value) }
+        } else {
+            quote! { value }
+        };
         quote!(
             if let Some(value) = self.#ident.as_ref() {
-                query = query.bind(1)
+                query = query.bind(#value_getter)
             }
         )
     });

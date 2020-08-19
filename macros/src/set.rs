@@ -22,13 +22,19 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
     let pkey = &entity.id.ident;
     let vis = &entity.vis;
 
+    let value_converter = if let Some(convert_fn) = &field.convert {
+        quote! { #convert_fn(&value) }
+    } else {
+        quote! { value }
+    };
+
     quote! {
         #vis async fn #fn_name(
             &mut self,
             con: impl sqlx::Executor<'_, Database=sqlx::Postgres>,
             value: #field_ty
         ) -> sqlx::Result<()> {
-            sqlx::query!(#query, value, &self.#pkey)
+            sqlx::query!(#query, #value_converter, &self.#pkey)
                 .execute(con)
                 .await?;
             self.#field_ident = value;

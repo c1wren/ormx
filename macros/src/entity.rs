@@ -11,6 +11,7 @@ pub struct EntityField {
     pub get_many: Option<Ident>,
     pub set: Option<Ident>,
     pub delete: Option<Ident>,
+    pub convert: Option<ExprPath>,
     pub column_name: String,
     pub ident: Ident,
     pub ty: Type,
@@ -24,7 +25,7 @@ pub struct EntityField {
 impl EntityField {
     pub fn fmt_for_select(&self) -> String {
         if self.custom_type {
-            return format!("{} AS `{}: _`", self.column_name, self.ident);
+            return format!(r#"{} AS "{}: _""#, self.column_name, self.ident);
         }
 
         let ident = self.ident.to_string();
@@ -92,6 +93,7 @@ impl TryFrom<&Field> for EntityField {
             get_many: None,
             delete: None,
             set: None,
+            convert: None,
             ty: field.ty.clone(),
             column_name: ident.to_string(),
             ident: ident.clone(),
@@ -132,6 +134,7 @@ impl TryFrom<&Field> for EntityField {
                 FieldAttr::CustomType => {
                     result.custom_type = true;
                 }
+                FieldAttr::Convert(function) => result.convert = Some(function),
             }
         }
 

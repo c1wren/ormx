@@ -1,7 +1,7 @@
-use proc_macro2::{Ident, Span};
+use proc_macro2::{Group, Ident, Span, TokenStream, TokenTree};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
-use syn::{Attribute, Error, LitBool, LitStr, Result, Token};
+use syn::{Attribute, Error, ExprPath, LitBool, LitStr, Result, Token};
 
 pub enum EntityAttr {
     Table(String),
@@ -44,6 +44,7 @@ pub enum FieldAttr {
     Set(Option<Ident>),
     Updatable(bool),
     Patchable(bool),
+    Convert(ExprPath),
     Generated,
     CustomType,
 }
@@ -64,6 +65,7 @@ impl Parse for FieldAttr {
             "custom_type" => CustomType,
             "patchable" => Patchable(opt_assign_bool(&input)?.unwrap_or(true)),
             "updatable" => Updatable(opt_assign_bool(&input)?.unwrap_or(true)),
+            "convert" => Convert(assign_expr_path(ident.span(), &input)?),
             other => {
                 return Err(Error::new(
                     ident.span(),
@@ -108,4 +110,30 @@ fn opt_assign_bool(input: &ParseStream) -> Result<Option<bool>> {
 
 fn assign_string(span: Span, input: &ParseStream) -> Result<String> {
     assign::<LitStr>(span, input).map(|lit| lit.value())
+}
+
+fn assign_expr_path(span: Span, input: &ParseStream) -> Result<ExprPath> {
+    let lit_str = assign::<LitStr>(span, input)?;
+    let tokens = spanned_tokens(&lit_str)?;
+    syn::parse2(tokens)
+}
+
+fn spanned_tokens(s: &syn::LitStr) -> Result<TokenStream> {
+    let stream = syn::parse_str(&s.value())?;
+    Ok(respan_token_stream(stream, s.span()))
+}
+
+fn respan_token_stream(stream: TokenStream, span: Span) -> TokenStream {
+    stream
+        .into_iter()
+        .map(|token| respan_token_tree(token, span))
+        .collect()
+}
+
+fn respan_token_tree(mut token: TokenTree, span: Span) -> TokenTree {
+    if let TokenTree::Group(g) = &mut token {
+        *g = Group::new(g.delimiter(), respan_token_stream(g.stream(), span));
+    }
+    token.set_span(span);
+    token
 }

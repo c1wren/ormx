@@ -33,6 +33,18 @@ fn insert_fn(entity: &Entity) -> TokenStream {
         .map(|field| &field.ident)
         .collect::<Vec<_>>();
 
+    let query_idents = entity
+        .insertable_fields()
+        .map(|field| {
+            let ident = &field.ident;
+            if let Some(convert_fn) = &field.convert {
+                quote! { #convert_fn(&self.#ident) }
+            } else {
+                quote! { self.#ident }
+            }
+        })
+        .collect::<Vec<_>>();
+
     let generated_idents = entity
         .generated_fields()
         .map(|field| &field.ident)
@@ -54,12 +66,12 @@ fn insert_fn(entity: &Entity) -> TokenStream {
         /// Insert a row into the database.
         #vis async fn insert(
             self,
-            __con: &mut sqlx::PgConnection,
+            __con: &mut PgPool,
         ) -> sqlx::Result<#entity_ident> {
             use sqlx::Connection;
             let mut tx = __con.begin().await?;
 
-            let rec = sqlx::query!(#insert_sql, #(self.#insertable_idents),*)
+            let rec = sqlx::query!(#insert_sql, #(#query_idents),*)
                 .fetch_one(&mut tx)
                 .await?;
 

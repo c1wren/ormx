@@ -60,12 +60,18 @@ fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
     let vis = &entity.vis;
     let query = build_query(entity, Some(field));
 
+    let by_converter = if let Some(convert_fn) = &field.convert {
+        quote! { #convert_fn(&by) }
+    } else {
+        quote! { by }
+    };
+
     quote! {
         #vis async fn #fn_name(
             con: impl sqlx::Executor<'_, Database=sqlx::Postgres>,
             by: &#by
         ) -> sqlx::Result<Self> {
-            sqlx::query_as!(Self, #query, by)
+            sqlx::query_as!(Self, #query, #by_converter)
                 .fetch_one(con)
                 .await
         }
@@ -77,12 +83,18 @@ fn optional(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStrea
     let vis = &entity.vis;
     let query = build_query(entity, Some(field));
 
+    let by_converter = if let Some(convert_fn) = &field.convert {
+        quote! { #convert_fn(&by) }
+    } else {
+        quote! { by }
+    };
+
     quote! {
         #vis async fn #fn_name(
             con: impl sqlx::Executor<'_, Database=sqlx::Postgres>,
             by: &#by
         ) -> sqlx::Result<Option<Self>> {
-            sqlx::query_as!(Self, #query, by)
+            sqlx::query_as!(Self, #query, #by_converter)
                 .fetch_optional(con)
                 .await
         }
@@ -94,12 +106,18 @@ fn many(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     let vis = &entity.vis;
     let query = build_query(entity, Some(field));
 
+    let by_converter = if let Some(convert_fn) = &field.convert {
+        quote! { #convert_fn(&by) }
+    } else {
+        quote! { by }
+    };
+
     quote! {
         #vis async fn #fn_name(
             con: impl sqlx::Executor<'_, Database=sqlx::Postgres>,
-            by: #by
+            by: &#by
         ) -> sqlx::Result<Vec<Self>> {
-            sqlx::query_as!(Self, #query, by)
+            sqlx::query_as!(Self, #query, #by_converter)
                 .fetch_all(con)
                 .await
         }
