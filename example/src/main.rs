@@ -75,13 +75,7 @@ fn enum_convert(val: &TestEnum) -> i32 {
 }
 
 #[derive(ormx::Entity, sqlx::FromRow, Debug)]
-#[ormx(
-    table = "clubs",
-    id = id,
-    insertable,
-    patchable,
-    deletable
-)]
+#[ormx(table = "clubs", id = "id", insertable, patchable, deletable)]
 struct Club {
     #[ormx(get_optional = "by_id")]
     id: i32,

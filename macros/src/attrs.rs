@@ -19,7 +19,7 @@ impl Parse for EntityAttr {
         let ident = input.parse::<Ident>()?;
         let attr = match &*ident.to_string() {
             "table" => Table(assign_string(ident.span(), &input)?),
-            "id" => Id(assign(ident.span(), &input)?),
+            "id" => Id(assign_ident(ident.span(), &input)?),
             "insertable" => Insertable(opt_assign_ident(&input)?),
             "patchable" => Patchable(opt_assign_ident(&input)?),
             "deletable" => Deletable(opt_assign_ident(&input)?),
@@ -92,6 +92,10 @@ pub fn parse_all<P: Parse>(attrs: &[Attribute]) -> Result<Vec<P>> {
 
 fn assign<V: Parse>(span: Span, input: &ParseStream) -> Result<V> {
     opt_assign(&input)?.ok_or_else(|| Error::new(span, "missing value"))
+}
+
+fn assign_ident(span: Span, input: &ParseStream) -> Result<Ident> {
+    opt_assign_ident(&input)?.ok_or_else(|| Error::new(span, "missing value"))
 }
 
 fn opt_assign_ident(input: &ParseStream) -> Result<Option<Ident>> {
