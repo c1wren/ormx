@@ -20,10 +20,10 @@ impl Parse for EntityAttr {
         let attr = match &*ident.to_string() {
             "table" => Table(assign_string(ident.span(), &input)?),
             "id" => Id(assign(ident.span(), &input)?),
-            "insertable" => Insertable(opt_assign(&input)?),
-            "patchable" => Patchable(opt_assign(&input)?),
-            "deletable" => Deletable(opt_assign(&input)?),
-            "get_all" => GetAll(opt_assign(&input)?),
+            "insertable" => Insertable(opt_assign_ident(&input)?),
+            "patchable" => Patchable(opt_assign_ident(&input)?),
+            "deletable" => Deletable(opt_assign_ident(&input)?),
+            "get_all" => GetAll(opt_assign_ident(&input)?),
             other => {
                 return Err(Error::new(
                     ident.span(),
@@ -56,11 +56,11 @@ impl Parse for FieldAttr {
         let ident = input.parse::<Ident>()?;
         let attr = match &*ident.to_string() {
             "rename" => Rename(assign_string(ident.span(), &input)?),
-            "set" => Set(opt_assign(&input)?),
-            "get_one" => GetOne(opt_assign(&input)?),
-            "get_optional" => GetOptional(opt_assign(&input)?),
-            "get_many" => GetMany(opt_assign(&input)?),
-            "delete" => Delete(opt_assign(&input)?),
+            "set" => Set(opt_assign_ident(&input)?),
+            "get_one" => GetOne(opt_assign_ident(&input)?),
+            "get_optional" => GetOptional(opt_assign_ident(&input)?),
+            "get_many" => GetMany(opt_assign_ident(&input)?),
+            "delete" => Delete(opt_assign_ident(&input)?),
             "generated" => Generated,
             "custom_type" => CustomType,
             "patchable" => Patchable(opt_assign_bool(&input)?.unwrap_or(true)),
@@ -92,6 +92,15 @@ pub fn parse_all<P: Parse>(attrs: &[Attribute]) -> Result<Vec<P>> {
 
 fn assign<V: Parse>(span: Span, input: &ParseStream) -> Result<V> {
     opt_assign(&input)?.ok_or_else(|| Error::new(span, "missing value"))
+}
+
+fn opt_assign_ident(input: &ParseStream) -> Result<Option<Ident>> {
+    if let Some(lit_str) = opt_assign(&input)? {
+        let tokens = spanned_tokens(&lit_str)?;
+        Ok(Some(syn::parse2(tokens)?))
+    } else {
+        Ok(None)
+    }
 }
 
 fn opt_assign<V: Parse>(input: &ParseStream) -> Result<Option<V>> {

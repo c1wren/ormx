@@ -74,7 +74,7 @@ fn enum_convert(val: &TestEnum) -> i32 {
     *val as i32
 }
 
-#[derive(ormx::Entity, Debug)]
+#[derive(ormx::Entity, sqlx::FromRow, Debug)]
 #[ormx(
     table = "clubs",
     id = id,
@@ -83,14 +83,11 @@ fn enum_convert(val: &TestEnum) -> i32 {
     deletable
 )]
 struct Club {
-    #[ormx(get_optional = by_id)]
+    #[ormx(get_optional = "by_id")]
     id: i32,
     name: String,
     test1: String,
-    #[ormx(
-      get_optional = by_name,
-      set = update_name
-    )]
+    #[ormx(get_optional = "by_name", set = "update_name")]
     #[ormx(custom_type, convert = "enum_convert")]
     test2: TestEnum,
     test3: Option<bool>,
