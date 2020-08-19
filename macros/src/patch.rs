@@ -30,8 +30,10 @@ fn patch_struct(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
 
     let setters = entity
         .patchable_fields()
-        .map(|EntityField { ident, ty, .. }| {
-            let setter = Ident::new(&format!("set_{}", ident), Span::call_site());
+        .map(|EntityField { ident, ty, set, .. }| {
+            let setter = set
+                .clone()
+                .unwrap_or_else(|| Ident::new(&format!("set_{}", ident), Span::call_site()));
             quote!(fn #setter(mut self, value: #ty) -> Self {
                 self.#ident = Some(value);
                 self
