@@ -37,10 +37,15 @@ fn insert_fn(entity: &Entity) -> TokenStream {
         .insertable_fields()
         .map(|field| {
             let ident = &field.ident;
-            match &field.convert {
+            let value = match &field.convert {
                 Some(ConvertType::As(t)) => quote! { self.#ident as #t },
                 Some(ConvertType::Function(convert_fn)) => quote! { #convert_fn(&self.#ident) },
                 None => quote! { self.#ident },
+            };
+            if field.custom_type {
+                quote! { #value as _ }
+            } else {
+                value
             }
         })
         .collect::<Vec<_>>();

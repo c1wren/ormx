@@ -14,16 +14,24 @@ pub fn update(entity: &Entity) -> TokenStream {
             .join(", "),
         entity.id.column_name
     );
+    dbg!(&sql);
 
     let id_ident = &entity.id.ident;
     let vis = &entity.vis;
 
     let updatable_fields = entity.updatable_fields().map(|field| {
         let ident = &field.ident;
-        match &field.convert {
+        let value = match &field.convert {
             Some(ConvertType::As(t)) => quote! { self.#ident as #t },
             Some(ConvertType::Function(convert_fn)) => quote! { #convert_fn(&self.#ident) },
             None => quote! { self.#ident },
+        };
+
+        if field.custom_type {
+            // let ty = &field.ty;
+            quote! { #value as _ }
+        } else {
+            value
         }
     });
 
