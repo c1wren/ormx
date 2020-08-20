@@ -14,7 +14,6 @@ pub fn update(entity: &Entity) -> TokenStream {
             .join(", "),
         entity.id.column_name
     );
-    dbg!(&sql);
 
     let id_ident = &entity.id.ident;
     let vis = &entity.vis;
@@ -28,7 +27,6 @@ pub fn update(entity: &Entity) -> TokenStream {
         };
 
         if field.custom_type {
-            // let ty = &field.ty;
             quote! { #value as _ }
         } else {
             value
