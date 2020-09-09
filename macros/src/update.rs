@@ -10,7 +10,11 @@ pub fn update(entity: &Entity) -> TokenStream {
         entity
             .updatable_fields()
             .enumerate()
-            .map(|(index, field)| format!("{} = ${}", field.column_name, index + 2))
+            .map(|(index, field)| format!(
+                "{} = ${}",
+                field.column_name.replace("r#", ""),
+                index + 2
+            ))
             .join(", "),
         entity.id.column_name
     );

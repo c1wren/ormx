@@ -5,12 +5,14 @@ use sqlx::postgres::PgPoolOptions;
 async fn main() -> Result<()> {
     env_logger::init();
 
+    // setup connection pool
     let database_url = "postgres://postgres@127.0.0.1/beta".to_string();
     let db_pool = PgPoolOptions::new()
         .max_connections(5)
         .connect(&database_url)
         .await?;
 
+    // test insertion
     let mut club = InsertClub {
         name: "test 4".into(),
         test1: "test 4".into(),
@@ -23,25 +25,33 @@ async fn main() -> Result<()> {
     .await?;
     dbg!(&club);
 
+    // test patching
     let patch = PatchClub::default().set_name("New Name".into());
     club.patch(&db_pool, patch).await?;
-
     dbg!(club);
 
+    // test get_optional
     let club = Club::by_name(&db_pool, &TestEnum::Test1).await?;
     dbg!(club);
 
+    // test get_optional
     if let Some(club) = Club::by_id(&db_pool, &1).await? {
+        // fetch by_id and then delete that club
         club.delete(&db_pool).await?;
         println!("deleted");
     }
 
+    // fetch a different club and then use the 'set' update_name
     if let Some(mut club) = Club::by_id(&db_pool, &2).await? {
         club.update_name(&db_pool, TestEnum::Test4).await?;
         dbg!(club);
     } else {
         println!("club not found")
     }
+
+    // find all clubs
+    let clubs = Club::find_all_clubs(&db_pool).await?;
+    dbg!(clubs);
 
     Ok(())
 }
@@ -67,19 +77,29 @@ pub enum TestEnum {
 }
 
 #[derive(ormx::Entity, sqlx::FromRow, Debug)]
-#[ormx(table = "clubs", id = "id", insertable, patchable, deletable)]
+#[ormx(
+    table = "clubs",
+    id = "id",
+    insertable,
+    patchable,
+    deletable,
+    get_all = "find_all_clubs"
+)]
 struct Club {
     #[ormx(get_optional = "by_id")]
     id: i32,
     name: String,
     test1: String,
     #[ormx(get_optional = "by_name", set = "update_name")]
+    // use a custom type that is really an i32
+    // custom_type really includes the type in the sqlx query type checking
     #[ormx(custom_type, convert_as = "i32")]
     test2: TestEnum,
     test3: Option<bool>,
+    // only need special convert here because of Option<Vec>
+    // if not Option<Vec>, you can use #[ormx(convert = "Vec::as_slice")]
     #[ormx(convert = "my_convert")]
     test4: Option<Vec<i32>>,
-    #[ormx(set = "set_type", rename = "type")]
     r#type: i32,
 }
 

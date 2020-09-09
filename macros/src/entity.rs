@@ -24,17 +24,14 @@ pub struct EntityField {
 
 impl EntityField {
     pub fn fmt_for_select(&self) -> String {
-        if self.custom_type {
-            return format!(r#"{} AS "{}: _""#, self.column_name, self.ident);
-        }
-
         let ident = self.ident.to_string().replace("r#", "");
+        let column_name = self.column_name.to_string().replace("r#", "");
 
-        if ident == self.column_name {
-            ident
-        } else {
-            format!("{} AS {}", self.column_name, self.ident)
+        if self.custom_type {
+            return format!(r#"{} AS "{}: _""#, column_name, ident);
         }
+
+        ident
     }
 }
 

@@ -99,7 +99,10 @@ fn insert_sql(entity: &Entity) -> String {
     format!(
         "INSERT INTO {} ({}) VALUES ({}) RETURNING {}",
         entity.table_name,
-        insertable.iter().map(|field| &field.column_name).join(","),
+        insertable
+            .iter()
+            .map(|field| field.column_name.replace("r#", ""))
+            .join(","),
         (1..=insertable.len()).map(|i| format!("${}", i)).join(","),
         columns
     )
