@@ -31,11 +31,11 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
     quote! {
         #vis async fn #fn_name(
             &mut self,
-            con: impl sqlx::Executor<'_, Database=sqlx::Postgres>,
+            con: &mut sqlx::PgConnection,
             value: #field_ty
         ) -> sqlx::Result<()> {
             sqlx::query!(#query, #value_converter, &self.#pkey)
-                .execute(con)
+                .execute(&mut *con)
                 .await?;
             self.#field_ident = value;
             Ok(())

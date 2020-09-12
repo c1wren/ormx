@@ -40,9 +40,9 @@ pub fn update(entity: &Entity) -> TokenStream {
     quote! {
         #vis async fn update(
             &self,
-            con: impl sqlx::Executor<'_, Database=sqlx::Postgres>
+            con: &mut sqlx::PgConnection
         ) -> sqlx::Result<()> {
-            sqlx::query!(#sql, self.#id_ident, #(#updatable_fields,)*).execute(con).await?;
+            sqlx::query!(#sql, self.#id_ident, #(#updatable_fields,)*).execute(&mut *con).await?;
             Ok(())
         }
     }

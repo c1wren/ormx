@@ -46,10 +46,10 @@ fn get_all(entity: &Entity) -> TokenStream2 {
 
     quote! {
         #vis async fn #fn_name(
-            con: impl sqlx::Executor<'_, Database=sqlx::Postgres>
+            con: &mut sqlx::PgConnection
         ) -> sqlx::Result<Vec<Self>> {
             sqlx::query_as!(Self, #sql)
-                .fetch_all(con)
+                .fetch_all(&mut *con)
                 .await
         }
     }
@@ -68,11 +68,11 @@ fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
 
     quote! {
         #vis async fn #fn_name(
-            con: impl sqlx::Executor<'_, Database=sqlx::Postgres>,
+            con: &mut sqlx::PgConnection,
             by: &#by
         ) -> sqlx::Result<Self> {
             sqlx::query_as!(Self, #query, #by_converter)
-                .fetch_one(con)
+                .fetch_one(&mut *con)
                 .await
         }
     }
@@ -91,11 +91,11 @@ fn optional(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStrea
 
     quote! {
         #vis async fn #fn_name(
-            con: impl sqlx::Executor<'_, Database=sqlx::Postgres>,
+            con: &mut sqlx::PgConnection,
             by: &#by
         ) -> sqlx::Result<Option<Self>> {
             sqlx::query_as!(Self, #query, #by_converter)
-                .fetch_optional(con)
+                .fetch_optional(&mut *con)
                 .await
         }
     }
@@ -114,11 +114,11 @@ fn many(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
 
     quote! {
         #vis async fn #fn_name(
-            con: impl sqlx::Executor<'_, Database=sqlx::Postgres>,
+            con: &mut sqlx::PgConnection,
             by: &#by
         ) -> sqlx::Result<Vec<Self>> {
             sqlx::query_as!(Self, #query, #by_converter)
-                .fetch_all(con)
+                .fetch_all(&mut *con)
                 .await
         }
     }

@@ -17,40 +17,40 @@ async fn main() -> Result<()> {
         name: "test 4".into(),
         test1: "test 4".into(),
         test2: TestEnum::Test2,
-        test3: Some(false),
         test4: Some(vec![1, 2, 3, 4]),
         r#type: 3,
     }
-    .insert(&db_pool)
+    .insert(&mut *db_pool.acquire().await?)
     .await?;
     dbg!(&club);
 
     // test patching
     let patch = PatchClub::default().set_name("New Name".into());
-    club.patch(&db_pool, patch).await?;
+    club.patch(&mut *db_pool.acquire().await?, patch).await?;
     dbg!(club);
 
     // test get_optional
-    let club = Club::by_name(&db_pool, &TestEnum::Test1).await?;
+    let club = Club::by_name(&mut *db_pool.acquire().await?, &TestEnum::Test1).await?;
     dbg!(club);
 
     // test get_optional
-    if let Some(club) = Club::by_id(&db_pool, &1).await? {
+    if let Some(club) = Club::by_id(&mut *db_pool.acquire().await?, &1).await? {
         // fetch by_id and then delete that club
-        club.delete(&db_pool).await?;
+        club.delete(&mut *db_pool.acquire().await?).await?;
         println!("deleted");
     }
 
     // fetch a different club and then use the 'set' update_name
-    if let Some(mut club) = Club::by_id(&db_pool, &2).await? {
-        club.update_name(&db_pool, TestEnum::Test4).await?;
+    if let Some(mut club) = Club::by_id(&mut *db_pool.acquire().await?, &2).await? {
+        club.update_name(&mut *db_pool.acquire().await?, TestEnum::Test4)
+            .await?;
         dbg!(club);
     } else {
         println!("club not found")
     }
 
     // find all clubs
-    let clubs = Club::find_all_clubs(&db_pool).await?;
+    let clubs = Club::find_all_clubs(&mut *db_pool.acquire().await?).await?;
     dbg!(clubs);
 
     Ok(())
@@ -95,6 +95,7 @@ struct Club {
     // custom_type really includes the type in the sqlx query type checking
     #[ormx(custom_type, convert_as = "i32")]
     test2: TestEnum,
+    #[ormx(generated)]
     test3: Option<bool>,
     // only need special convert here because of Option<Vec>
     // if not Option<Vec>, you can use #[ormx(convert = "Vec::as_slice")]

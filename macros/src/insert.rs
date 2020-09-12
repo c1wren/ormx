@@ -58,7 +58,7 @@ fn insert_fn(entity: &Entity) -> TokenStream {
         quote!()
     } else {
         let sql = query_generated_sql(entity);
-        quote!(let generated = sqlx::query!(#sql, rec.id).fetch_one(&mut tx).await?;)
+        quote!(let generated = sqlx::query!(#sql, rec.id).fetch_one(&mut *tx).await?;)
     };
 
     let vis = &entity.vis;
@@ -71,13 +71,17 @@ fn insert_fn(entity: &Entity) -> TokenStream {
         /// Insert a row into the database.
         #vis async fn insert(
             self,
-            con: impl sqlx::Executor<'_, Database=sqlx::Postgres>,
+            con: &mut sqlx::PgConnection,
         ) -> sqlx::Result<#entity_ident> {
+            let mut tx = sqlx::Connection::begin(con).await?;
+
             let rec = sqlx::query_as!(#entity_ident, #insert_sql, #(#query_idents),*)
-                .fetch_one(con)
+                .fetch_one(&mut *tx)
                 .await?;
 
             #query_generated
+
+            tx.commit().await?;
 
             Ok(#entity_ident {
                 #id_ident: rec.id as _,
