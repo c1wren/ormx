@@ -28,11 +28,6 @@ pub fn insert(entity: &Entity) -> TokenStream {
 }
 
 fn insert_fn(entity: &Entity) -> TokenStream {
-    let insertable_idents = entity
-        .insertable_fields()
-        .map(|field| &field.ident)
-        .collect::<Vec<_>>();
-
     let query_idents = entity
         .insertable_fields()
         .map(|field| {
@@ -50,22 +45,10 @@ fn insert_fn(entity: &Entity) -> TokenStream {
         })
         .collect::<Vec<_>>();
 
-    let generated_idents = entity
-        .generated_fields()
-        .map(|field| &field.ident)
-        .collect::<Vec<_>>();
-    let query_generated = if generated_idents.is_empty() {
-        quote!()
-    } else {
-        let sql = query_generated_sql(entity);
-        quote!(let generated = sqlx::query!(#sql, rec.id).fetch_one(&mut *tx).await?;)
-    };
-
     let vis = &entity.vis;
 
     let entity_ident = &entity.ident;
     let insert_sql = insert_sql(entity);
-    let id_ident = &entity.id.ident;
 
     quote! {
         /// Insert a row into the database.
@@ -73,21 +56,11 @@ fn insert_fn(entity: &Entity) -> TokenStream {
             self,
             con: &mut sqlx::PgConnection,
         ) -> sqlx::Result<#entity_ident> {
-            let mut tx = sqlx::Connection::begin(con).await?;
-
             let rec = sqlx::query_as!(#entity_ident, #insert_sql, #(#query_idents),*)
-                .fetch_one(&mut *tx)
+                .fetch_one(con)
                 .await?;
 
-            #query_generated
-
-            tx.commit().await?;
-
-            Ok(#entity_ident {
-                #id_ident: rec.id as _,
-                #(#insertable_idents: self.#insertable_idents,)*
-                #(#generated_idents: generated.#generated_idents),*
-            })
+            Ok(rec)
         }
     }
 }

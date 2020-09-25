@@ -13,7 +13,8 @@ async fn main() -> Result<()> {
         .await?;
 
     // test insertion
-    let mut club = InsertClub {
+    // returns a Club
+    let mut club: Club = InsertClub {
         name: "test 4".into(),
         test1: "test 4".into(),
         test2: TestEnum::Test2,
