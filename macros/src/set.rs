@@ -35,7 +35,7 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
             value: #field_ty
         ) -> sqlx::Result<()> {
             sqlx::query!(#query, #value_converter, &self.#pkey)
-                .execute(&mut *con)
+                .execute(con)
                 .await?;
             self.#field_ident = value;
             Ok(())

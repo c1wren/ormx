@@ -42,7 +42,7 @@ pub fn update(entity: &Entity) -> TokenStream {
             &self,
             con: &mut sqlx::PgConnection
         ) -> sqlx::Result<()> {
-            sqlx::query!(#sql, self.#id_ident, #(#updatable_fields,)*).execute(&mut *con).await?;
+            sqlx::query!(#sql, self.#id_ident, #(#updatable_fields,)*).execute(con).await?;
             Ok(())
         }
     }

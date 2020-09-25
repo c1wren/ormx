@@ -110,7 +110,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
                 let mut query = sqlx::query(&sql).bind(id);
                 #(#binding)*
 
-                query.execute(&mut *con).await?;
+                query.execute(con).await?;
 
                 Ok(())
             }
@@ -122,7 +122,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
                 con: &mut sqlx::PgConnection,
                 update: #patch_struct_ident,
             ) -> sqlx::Result<()> {
-                #patch_struct_ident::patch(&update, &mut *con, &self.#id_ident).await?;
+                #patch_struct_ident::patch(&update, con, &self.#id_ident).await?;
 
                 #(if let Some(new_value) = update.#patchable_fields {
                     self.#patchable_fields = new_value;

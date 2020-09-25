@@ -49,7 +49,7 @@ fn get_all(entity: &Entity) -> TokenStream2 {
             con: &mut sqlx::PgConnection
         ) -> sqlx::Result<Vec<Self>> {
             sqlx::query_as!(Self, #sql)
-                .fetch_all(&mut *con)
+                .fetch_all(con)
                 .await
         }
     }
@@ -72,7 +72,7 @@ fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
             by: &#by
         ) -> sqlx::Result<Self> {
             sqlx::query_as!(Self, #query, #by_converter)
-                .fetch_one(&mut *con)
+                .fetch_one(con)
                 .await
         }
     }
@@ -95,7 +95,7 @@ fn optional(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStrea
             by: &#by
         ) -> sqlx::Result<Option<Self>> {
             sqlx::query_as!(Self, #query, #by_converter)
-                .fetch_optional(&mut *con)
+                .fetch_optional(con)
                 .await
         }
     }
@@ -118,7 +118,7 @@ fn many(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
             by: &#by
         ) -> sqlx::Result<Vec<Self>> {
             sqlx::query_as!(Self, #query, #by_converter)
-                .fetch_all(&mut *con)
+                .fetch_all(con)
                 .await
         }
     }
