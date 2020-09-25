@@ -84,15 +84,3 @@ fn insert_sql(entity: &Entity) -> String {
         columns
     )
 }
-
-fn query_generated_sql(entity: &Entity) -> String {
-    format!(
-        "SELECT {} FROM {} WHERE {} = $1",
-        entity
-            .generated_fields()
-            .map(EntityField::fmt_for_select)
-            .join(","),
-        entity.table_name,
-        entity.id.column_name
-    )
-}

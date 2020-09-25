@@ -57,10 +57,6 @@ impl Entity {
             .filter(move |field| !(id == field.ident || field.generated))
     }
 
-    pub fn generated_fields(&self) -> impl Iterator<Item = &EntityField> {
-        self.fields.iter().filter(move |field| field.generated)
-    }
-
     pub fn patchable_fields(&self) -> impl Iterator<Item = &EntityField> {
         let id = self.id.ident.clone();
         self.fields
