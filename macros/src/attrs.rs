@@ -45,7 +45,7 @@ pub enum FieldAttr {
     Updatable(bool),
     Patchable(bool),
     Convert(ConvertType),
-    Generated,
+    Default,
     CustomType,
 }
 
@@ -67,7 +67,7 @@ impl Parse for FieldAttr {
             "get_optional" => GetOptional(opt_assign_ident(&input)?),
             "get_many" => GetMany(opt_assign_ident(&input)?),
             "delete" => Delete(opt_assign_ident(&input)?),
-            "generated" => Generated,
+            "default" => Default,
             "custom_type" => CustomType,
             "patchable" => Patchable(opt_assign_bool(&input)?.unwrap_or(true)),
             "updatable" => Updatable(opt_assign_bool(&input)?.unwrap_or(true)),

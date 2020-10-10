@@ -96,7 +96,7 @@ struct Club {
     // custom_type really includes the type in the sqlx query type checking
     #[ormx(custom_type, convert_as = "i32")]
     test2: TestEnum,
-    #[ormx(generated)]
+    #[ormx(default)]
     test3: Option<bool>,
     // only need special convert here because of Option<Vec>
     // if not Option<Vec>, you can use #[ormx(convert = "Vec::as_slice")]

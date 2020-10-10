@@ -16,7 +16,7 @@ pub struct EntityField {
     pub ident: Ident,
     pub ty: Type,
 
-    pub generated: bool,
+    pub default: bool,
     pub updatable: bool,
     pub patchable: bool,
     pub custom_type: bool,
@@ -54,7 +54,7 @@ impl Entity {
         let id = self.id.ident.clone();
         self.fields
             .iter()
-            .filter(move |field| !(id == field.ident || field.generated))
+            .filter(move |field| !(id == field.ident || field.default))
     }
 
     pub fn patchable_fields(&self) -> impl Iterator<Item = &EntityField> {
@@ -92,7 +92,7 @@ impl TryFrom<&Field> for EntityField {
             ident: ident.clone(),
             updatable: true,
             patchable: true,
-            generated: false,
+            default: false,
             custom_type: false,
         };
         for attr in crate::attrs::parse_all::<FieldAttr>(&field.attrs)? {
@@ -120,9 +120,8 @@ impl TryFrom<&Field> for EntityField {
                 }
                 FieldAttr::Updatable(updatable) => result.updatable = updatable,
                 FieldAttr::Patchable(patchable) => result.patchable = patchable,
-                FieldAttr::Generated => {
-                    result.generated = true;
-                    result.patchable = false;
+                FieldAttr::Default => {
+                    result.default = true;
                 }
                 FieldAttr::CustomType => {
                     result.custom_type = true;
