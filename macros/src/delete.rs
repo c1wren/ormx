@@ -44,18 +44,18 @@ fn delete_self(entity: &Entity, fn_name: &Ident) -> TokenStream {
     }
 }
 
-fn delete_by(entity: &Entity, by: &EntityField, fn_name: &Ident) -> TokenStream {
+fn delete_by(entity: &Entity, val: &EntityField, fn_name: &Ident) -> TokenStream {
     let vis = &entity.vis;
-    let by_ty = &by.ty;
+    let val_ty = &val.ty;
     let sql = format!(
         "DELETE FROM {} WHERE {} = $1",
-        entity.table_name, by.column_name
+        entity.table_name, val.column_name
     );
 
     quote! {
         #vis async fn #fn_name(
             con: &mut sqlx::PgConnection,
-            by: &#by_ty,
+            val: &#val_ty,
         ) -> sqlx::Result<u64> {
             use sqlx::Done;
             let result = sqlx::query!(#sql, by).execute(con).await?;

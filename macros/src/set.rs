@@ -1,7 +1,7 @@
 use crate::{attrs::ConvertType, Entity, EntityField};
 use proc_macro2::Ident;
+use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::export::TokenStream2;
 
 pub fn setters(entity: &Entity) -> TokenStream2 {
     entity
