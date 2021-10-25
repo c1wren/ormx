@@ -44,7 +44,7 @@ fn patch_struct(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         });
 
     quote! {
-        #[derive(Default, Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[derive(Default, Clone, Debug)]
         #vis struct #patch_struct_ident {
             #(#fields),*
         }

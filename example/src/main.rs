@@ -6,7 +6,7 @@ async fn main() -> Result<()> {
     env_logger::init();
 
     // setup connection pool
-    let database_url = "postgres://postgres@127.0.0.1/beta".to_string();
+    let database_url = "postgres://postgres@127.0.0.1/ormx".to_string();
     let db_pool = PgPoolOptions::new()
         .max_connections(5)
         .connect(&database_url)
@@ -57,18 +57,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-#[derive(
-    serde::Serialize,
-    serde::Deserialize,
-    PartialEq,
-    PartialOrd,
-    Eq,
-    Ord,
-    Clone,
-    Copy,
-    Debug,
-    sqlx::Type,
-)]
+#[derive(Clone, Copy, Debug, sqlx::Type, serde::Serialize)]
 #[repr(i32)]
 pub enum TestEnum {
     Test1 = 1,

@@ -16,7 +16,7 @@ pub fn insert(entity: &Entity) -> TokenStream {
     let insert_fn = insert_fn(entity);
 
     quote! {
-        #[derive(Debug, serde::Serialize, serde::Deserialize)]
+        #[derive(Debug)]
         #vis struct #struct_ident {
             #(#fields),*
         }

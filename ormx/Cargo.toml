@@ -12,9 +12,3 @@ path = "../macros"
 [dependencies.futures]
 version = "0.3"
 
-[dependencies.serde]
-version = "1"
-features = ["derive"]
-
-[dev-dependencies]
-async-std = { version = "1.6", features = ["attributes"] }
