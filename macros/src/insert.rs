@@ -50,15 +50,40 @@ fn insert_fn(entity: &Entity) -> TokenStream {
     let entity_ident = &entity.ident;
     let insert_sql = insert_sql(entity);
 
+    let before_insert = if let Some(before_fn) = &entity.before_insert {
+        quote!(
+            #before_fn(&self, &mut *con).await?;
+        )
+    } else {
+        quote!()
+    };
+
+    let after_insert = if let Some(after_fn) = &entity.after_insert {
+        quote!(
+            let rec = sqlx::query_as!(#entity_ident, #insert_sql, #(#query_idents),*)
+                .fetch_one(&mut *con)
+                .await?;
+
+            #after_fn(&rec, con).await?;
+        )
+    } else {
+        quote!(
+            let rec = sqlx::query_as!(#entity_ident, #insert_sql, #(#query_idents),*)
+                .fetch_one(&mut *con)
+                .await?;
+
+        )
+    };
+
     quote! {
         /// Insert a row into the database.
         #vis async fn insert(
             self,
             con: &mut sqlx::PgConnection,
         ) -> sqlx::Result<#entity_ident> {
-            let rec = sqlx::query_as!(#entity_ident, #insert_sql, #(#query_idents),*)
-                .fetch_one(con)
-                .await?;
+            #before_insert
+
+            #after_insert
 
             Ok(rec)
         }

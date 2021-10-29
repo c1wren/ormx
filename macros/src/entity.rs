@@ -47,6 +47,15 @@ pub struct Entity {
 
     pub insert: Option<Ident>,
     pub patch: Option<Ident>,
+
+    pub before_patch: Option<ExprPath>,
+    pub after_patch: Option<ExprPath>,
+    pub before_update: Option<ExprPath>,
+    pub after_update: Option<ExprPath>,
+    pub before_insert: Option<ExprPath>,
+    pub after_insert: Option<ExprPath>,
+    pub before_delete: Option<ExprPath>,
+    pub after_delete: Option<ExprPath>,
 }
 
 impl Entity {
@@ -155,6 +164,14 @@ impl TryFrom<DeriveInput> for Entity {
         let mut patch = None;
         let mut get_all = None;
         let mut delete = None;
+        let mut before_patch = None;
+        let mut after_patch = None;
+        let mut before_update = None;
+        let mut after_update = None;
+        let mut before_insert = None;
+        let mut after_insert = None;
+        let mut before_delete = None;
+        let mut after_delete = None;
         for attr in crate::attrs::parse_all::<EntityAttr>(&input.attrs)? {
             match attr {
                 EntityAttr::Table(name) => table_name.replace(name).map_or(Ok(()), duplicate)?,
@@ -171,14 +188,24 @@ impl TryFrom<DeriveInput> for Entity {
                     });
                     patch.replace(struct_ident).map_or(Ok(()), duplicate)?
                 }
-                EntityAttr::GetAll(fun) => {
-                    let fun = fun.unwrap_or_else(|| Ident::new("get_all", Span::call_site()));
-                    get_all.replace(fun).map_or(Ok(()), duplicate)?
+                EntityAttr::GetAll(fn_name) => {
+                    let fn_name =
+                        fn_name.unwrap_or_else(|| Ident::new("get_all", Span::call_site()));
+                    get_all.replace(fn_name).map_or(Ok(()), duplicate)?
                 }
-                EntityAttr::Deletable(fun) => {
-                    let fun = fun.unwrap_or_else(|| Ident::new("delete", Span::call_site()));
-                    delete.replace(fun).map_or(Ok(()), duplicate)?
+                EntityAttr::Deletable(fn_name) => {
+                    let fn_name =
+                        fn_name.unwrap_or_else(|| Ident::new("delete", Span::call_site()));
+                    delete.replace(fn_name).map_or(Ok(()), duplicate)?
                 }
+                EntityAttr::BeforePatch(path) => before_patch = Some(path),
+                EntityAttr::AfterPatch(path) => after_patch = Some(path),
+                EntityAttr::BeforeUpdate(path) => before_update = Some(path),
+                EntityAttr::AfterUpdate(path) => after_update = Some(path),
+                EntityAttr::BeforeInsert(path) => before_insert = Some(path),
+                EntityAttr::AfterInsert(path) => after_insert = Some(path),
+                EntityAttr::BeforeDelete(path) => before_delete = Some(path),
+                EntityAttr::AfterDelete(path) => after_delete = Some(path),
             }
         }
         let table_name = table_name.ok_or_else(|| missing_attr("table"))?;
@@ -203,6 +230,14 @@ impl TryFrom<DeriveInput> for Entity {
             patch,
             get_all,
             delete,
+            before_patch,
+            after_patch,
+            before_update,
+            after_update,
+            before_insert,
+            after_insert,
+            before_delete,
+            after_delete,
         })
     }
 }

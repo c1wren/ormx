@@ -37,13 +37,48 @@ pub fn update(entity: &Entity) -> TokenStream {
         }
     });
 
+    let before_update = if let Some(before_fn) = &entity.before_update {
+        quote!(
+            #before_fn(self, &mut *con).await?;
+        )
+    } else {
+        quote!()
+    };
+
+    let sqlx_call = quote!(sqlx::query!(#sql, self.#id_ident, #(#updatable_fields,)*));
+
+    let after_update = if let Some(after_fn) = &entity.after_update {
+        quote!(
+            #sqlx_call.execute(&mut *con).await?;
+
+            #after_fn(self, con).await?;
+        )
+    } else {
+        quote!(
+            #sqlx_call.execute(con).await?;
+        )
+    };
+
     quote! {
         #vis async fn update(
             &self,
             con: &mut sqlx::PgConnection
         ) -> sqlx::Result<()> {
-            sqlx::query!(#sql, self.#id_ident, #(#updatable_fields,)*).execute(con).await?;
+            #before_update
+
+            #after_update
+
             Ok(())
         }
+
+        #vis async fn no_trigger_update(
+            &self,
+            con: &mut sqlx::PgConnection
+        ) -> sqlx::Result<()> {
+            #sqlx_call.execute(con).await?;
+
+            Ok(())
+        }
+
     }
 }

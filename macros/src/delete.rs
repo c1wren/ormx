@@ -33,12 +33,35 @@ fn delete_self(entity: &Entity, fn_name: &Ident) -> TokenStream {
         entity.table_name, entity.id.column_name
     );
 
+    let before_delete = if let Some(before_fn) = &entity.before_delete {
+        quote!(
+            #before_fn(&self, &mut *con).await?;
+        )
+    } else {
+        quote!()
+    };
+
+    let after_delete = if let Some(after_fn) = &entity.after_delete {
+        quote!(
+            sqlx::query!(#sql, self.#id_ident).execute(&mut *con).await?;
+
+            #after_fn(self, con).await?;
+        )
+    } else {
+        quote!(
+            sqlx::query!(#sql, self.#id_ident).execute(con).await?;
+        )
+    };
+
     quote! {
         #vis async fn #fn_name(
             self,
             con: &mut sqlx::PgConnection,
         ) -> sqlx::Result<()> {
-            sqlx::query!(#sql, self.#id_ident).execute(con).await?;
+            #before_delete
+
+            #after_delete
+
             Ok(())
         }
     }
@@ -58,7 +81,9 @@ fn delete_by(entity: &Entity, val: &EntityField, fn_name: &Ident) -> TokenStream
             val: &#val_ty,
         ) -> sqlx::Result<u64> {
             use sqlx::Done;
+
             let result = sqlx::query!(#sql, by).execute(con).await?;
+
             Ok(result.rows_affected())
         }
     }

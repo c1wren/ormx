@@ -10,6 +10,14 @@ pub enum EntityAttr {
     Patchable(Option<Ident>),
     GetAll(Option<Ident>),
     Deletable(Option<Ident>),
+    BeforePatch(ExprPath),
+    AfterPatch(ExprPath),
+    BeforeUpdate(ExprPath),
+    AfterUpdate(ExprPath),
+    BeforeInsert(ExprPath),
+    AfterInsert(ExprPath),
+    BeforeDelete(ExprPath),
+    AfterDelete(ExprPath),
 }
 
 impl Parse for EntityAttr {
@@ -24,6 +32,14 @@ impl Parse for EntityAttr {
             "patchable" => Patchable(opt_assign_ident(&input)?),
             "deletable" => Deletable(opt_assign_ident(&input)?),
             "get_all" => GetAll(opt_assign_ident(&input)?),
+            "before_patch" => BeforePatch(assign_expr_path(ident.span(), &input)?),
+            "after_patch" => AfterPatch(assign_expr_path(ident.span(), &input)?),
+            "before_update" => BeforeUpdate(assign_expr_path(ident.span(), &input)?),
+            "after_update" => AfterUpdate(assign_expr_path(ident.span(), &input)?),
+            "before_insert" => BeforeInsert(assign_expr_path(ident.span(), &input)?),
+            "after_insert" => AfterInsert(assign_expr_path(ident.span(), &input)?),
+            "before_delete" => BeforeDelete(assign_expr_path(ident.span(), &input)?),
+            "after_delete" => AfterDelete(assign_expr_path(ident.span(), &input)?),
             other => {
                 return Err(Error::new(
                     ident.span(),

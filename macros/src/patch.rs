@@ -91,6 +91,34 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         )
     });
 
+    let before_patch = if let Some(before_fn) = &entity.before_patch {
+        quote!(
+            #before_fn(self, &patch, &mut *con).await?;
+        )
+    } else {
+        quote!()
+    };
+
+    let after_patch = if let Some(after_fn) = &entity.after_patch {
+        quote!(
+            #patch_struct_ident::patch(&patch, &mut *con, &self.#id_ident).await?;
+
+            #(if let Some(new_value) = patch.#patchable_fields {
+                self.#patchable_fields = new_value;
+            })*
+
+            #after_fn(self, con).await?;
+        )
+    } else {
+        quote!(
+            #patch_struct_ident::patch(&patch, con, &self.#id_ident).await?;
+
+            #(if let Some(new_value) = patch.#patchable_fields {
+                self.#patchable_fields = new_value;
+            })*
+        )
+    };
+
     quote! {
         impl #patch_struct_ident {
             #vis async fn patch(
@@ -120,11 +148,25 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
             #vis async fn patch(
                 &mut self,
                 con: &mut sqlx::PgConnection,
-                update: #patch_struct_ident,
+                patch: #patch_struct_ident,
             ) -> sqlx::Result<()> {
-                #patch_struct_ident::patch(&update, con, &self.#id_ident).await?;
+                #before_patch
 
-                #(if let Some(new_value) = update.#patchable_fields {
+                #after_patch
+
+                Ok(())
+            }
+        }
+
+        impl #entity_ident {
+            #vis async fn no_trigger_patch(
+                &mut self,
+                con: &mut sqlx::PgConnection,
+                patch: #patch_struct_ident,
+            ) -> sqlx::Result<()> {
+                #patch_struct_ident::patch(&patch, con, &self.#id_ident).await?;
+
+                #(if let Some(new_value) = patch.#patchable_fields {
                     self.#patchable_fields = new_value;
                 })*
 

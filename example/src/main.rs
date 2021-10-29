@@ -1,5 +1,5 @@
 use anyhow::Result;
-use sqlx::postgres::PgPoolOptions;
+use sqlx::{postgres::PgPoolOptions, PgConnection};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -37,14 +37,17 @@ async fn main() -> Result<()> {
     // test get_optional
     if let Some(club) = Club::by_id(&mut *db_pool.acquire().await?, &1).await? {
         // fetch by_id and then delete that club
-        club.delete(&mut *db_pool.acquire().await?).await?;
-        println!("deleted");
+        club.my_delete(&mut *db_pool.acquire().await?).await?;
+        println!("deleted club");
     }
 
     // fetch a different club and then use the 'set' update_name
     if let Some(mut club) = Club::by_id(&mut *db_pool.acquire().await?, &2).await? {
-        club.update_name(&mut *db_pool.acquire().await?, TestEnum::Test4)
+        club.update_enum(&mut *db_pool.acquire().await?, TestEnum::Test4)
             .await?;
+        dbg!(&club);
+        club.name = "Testing 123".into();
+        club.update(&mut *db_pool.acquire().await?).await?;
         dbg!(club);
     } else {
         println!("club not found")
@@ -52,7 +55,11 @@ async fn main() -> Result<()> {
 
     // find all clubs
     let clubs = Club::find_all_clubs(&mut *db_pool.acquire().await?).await?;
-    dbg!(clubs);
+
+    for club in clubs {
+        dbg!(&club);
+        club.my_delete(&mut *db_pool.acquire().await?).await?;
+    }
 
     Ok(())
 }
@@ -66,21 +73,73 @@ pub enum TestEnum {
     Test4 = 4,
 }
 
+async fn before_patch(
+    _model: &Club,
+    _patch: &PatchClub,
+    _db_pool: &mut PgConnection,
+) -> sqlx::Result<()> {
+    println!("before patch");
+    Ok(())
+}
+
+async fn after_patch(_model: &Club, _db_pool: &mut PgConnection) -> sqlx::Result<()> {
+    println!("after patch");
+    Ok(())
+}
+
+async fn before_update(_model: &Club, _db_pool: &mut PgConnection) -> sqlx::Result<()> {
+    println!("before update");
+    Ok(())
+}
+
+async fn after_update(_model: &Club, _db_pool: &mut PgConnection) -> sqlx::Result<()> {
+    println!("after update");
+    Ok(())
+}
+
+async fn before_delete(_model: &Club, _db_pool: &mut PgConnection) -> sqlx::Result<()> {
+    println!("before delete");
+    Ok(())
+}
+
+async fn after_delete(_model: Club, _db_pool: &mut PgConnection) -> sqlx::Result<()> {
+    println!("after delete");
+    Ok(())
+}
+
+async fn before_insert(_model: &InsertClub, _db_pool: &mut PgConnection) -> sqlx::Result<()> {
+    println!("before insert");
+    Ok(())
+}
+
+async fn after_insert(_model: &Club, _db_pool: &mut PgConnection) -> sqlx::Result<()> {
+    println!("after insert");
+    Ok(())
+}
+
 #[derive(ormx::Entity, sqlx::FromRow, Debug)]
 #[ormx(
     table = "clubs",
     id = "id",
     insertable,
     patchable,
-    deletable,
-    get_all = "find_all_clubs"
+    deletable = "my_delete",
+    get_all = "find_all_clubs",
+    before_patch = "before_patch",
+    after_patch = "after_patch",
+    before_update = "before_update",
+    after_update = "after_update",
+    before_insert = "before_insert",
+    after_insert = "after_insert",
+    before_delete = "before_delete",
+    after_delete = "after_delete"
 )]
 struct Club {
     #[ormx(get_optional = "by_id")]
     id: i32,
     name: String,
     test1: String,
-    #[ormx(get_optional = "by_name", set = "update_name")]
+    #[ormx(get_optional = "by_name", set = "update_enum")]
     // use a custom type that is really an i32
     // custom_type really includes the type in the sqlx query type checking
     #[ormx(custom_type, convert_as = "i32")]
