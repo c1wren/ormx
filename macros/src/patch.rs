@@ -144,6 +144,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
             }
         }
 
+        /// Patches row by updating only the specific rows that have changed.
         impl #entity_ident {
             #vis async fn patch(
                 &mut self,
@@ -158,6 +159,9 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
             }
         }
 
+        /// Patches row by updating only the specific rows that have changed.
+        ///
+        /// Does not call the before and after triggers.
         impl #entity_ident {
             #vis async fn no_trigger_patch(
                 &mut self,

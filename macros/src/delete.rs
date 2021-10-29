@@ -54,6 +54,7 @@ fn delete_self(entity: &Entity, fn_name: &Ident) -> TokenStream {
     };
 
     quote! {
+        /// Deletes a row from the database.
         #vis async fn #fn_name(
             self,
             con: &mut sqlx::PgConnection,

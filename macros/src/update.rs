@@ -60,6 +60,7 @@ pub fn update(entity: &Entity) -> TokenStream {
     };
 
     quote! {
+        /// Updates a given row in the database by updating all fields, even if some fields haven't been changed.
         #vis async fn update(
             &self,
             con: &mut sqlx::PgConnection
@@ -71,6 +72,9 @@ pub fn update(entity: &Entity) -> TokenStream {
             Ok(())
         }
 
+        /// Updates a given row in the database by updating all fields, even if some fields haven't been changed.
+        ///
+        /// Does not call the before and after triggers.
         #vis async fn no_trigger_update(
             &self,
             con: &mut sqlx::PgConnection
