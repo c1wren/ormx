@@ -39,7 +39,7 @@ pub fn update(entity: &Entity) -> TokenStream {
 
     let before_update = if let Some(before_fn) = &entity.before_update {
         quote!(
-            #before_fn(self, &mut *con).await?;
+            #before_fn(self, &mut *conn).await?;
         )
     } else {
         quote!()
@@ -49,22 +49,28 @@ pub fn update(entity: &Entity) -> TokenStream {
 
     let after_update = if let Some(after_fn) = &entity.after_update {
         quote!(
-            #sqlx_call.execute(&mut *con).await?;
+            #sqlx_call.execute(&mut *conn).await?;
 
-            #after_fn(self, con).await?;
+            #after_fn(self, conn).await?;
         )
     } else {
         quote!(
-            #sqlx_call.execute(con).await?;
+            #sqlx_call.execute(conn).await?;
         )
+    };
+
+    let ret_type = if let Some(e_type) = &entity.error_type {
+        quote!(Result<(), #e_type>)
+    } else {
+        quote!(Result<(), sqlx::Error>)
     };
 
     quote! {
         /// Updates a given row in the database by updating all fields, even if some fields haven't been changed.
         #vis async fn update(
             &self,
-            con: &mut sqlx::PgConnection
-        ) -> sqlx::Result<()> {
+            conn: &mut sqlx::PgConnection
+        ) -> #ret_type {
             #before_update
 
             #after_update
@@ -77,9 +83,9 @@ pub fn update(entity: &Entity) -> TokenStream {
         /// Does not call the before and after triggers.
         #vis async fn no_trigger_update(
             &self,
-            con: &mut sqlx::PgConnection
-        ) -> sqlx::Result<()> {
-            #sqlx_call.execute(con).await?;
+            conn: &mut sqlx::PgConnection
+        ) -> #ret_type {
+            #sqlx_call.execute(conn).await?;
 
             Ok(())
         }

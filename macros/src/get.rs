@@ -44,13 +44,19 @@ fn get_all(entity: &Entity) -> TokenStream2 {
     let sql = build_query(entity, None);
     let vis = &entity.vis;
 
+    let ret_type = if let Some(e_type) = &entity.error_type {
+        quote!(Result<Vec<Self>, #e_type>)
+    } else {
+        quote!(Result<Vec<Self>, sqlx::Error>)
+    };
+
     quote! {
         #vis async fn #fn_name(
-            con: &mut sqlx::PgConnection
-        ) -> sqlx::Result<Vec<Self>> {
-            sqlx::query_as!(Self, #sql)
-                .fetch_all(con)
-                .await
+            conn: &mut sqlx::PgConnection
+        ) -> #ret_type {
+            Ok(sqlx::query_as!(Self, #sql)
+                .fetch_all(conn)
+                .await?)
         }
     }
 }
@@ -66,14 +72,20 @@ fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
         None => quote! { val },
     };
 
+    let ret_type = if let Some(e_type) = &entity.error_type {
+        quote!(Result<Self, #e_type>)
+    } else {
+        quote!(Result<Self, sqlx::Error>)
+    };
+
     quote! {
         #vis async fn #fn_name(
-            con: &mut sqlx::PgConnection,
+            conn: &mut sqlx::PgConnection,
             val: &#val
-        ) -> sqlx::Result<Self> {
-            sqlx::query_as!(Self, #query, #by_converter)
-                .fetch_one(con)
-                .await
+        ) -> #ret_type {
+            Ok(sqlx::query_as!(Self, #query, #by_converter)
+                .fetch_one(conn)
+                .await?)
         }
     }
 }
@@ -89,14 +101,20 @@ fn optional(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStrea
         None => quote! { val },
     };
 
+    let ret_type = if let Some(e_type) = &entity.error_type {
+        quote!(Result<Option<Self>, #e_type>)
+    } else {
+        quote!(Result<Option<Self>, sqlx::Error>)
+    };
+
     quote! {
         #vis async fn #fn_name(
-            con: &mut sqlx::PgConnection,
+            conn: &mut sqlx::PgConnection,
             val: &#val
-        ) -> sqlx::Result<Option<Self>> {
-            sqlx::query_as!(Self, #query, #by_converter)
-                .fetch_optional(con)
-                .await
+        ) -> #ret_type {
+            Ok(sqlx::query_as!(Self, #query, #by_converter)
+                .fetch_optional(conn)
+                .await?)
         }
     }
 }
@@ -112,14 +130,20 @@ fn many(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
         None => quote! { val },
     };
 
+    let ret_type = if let Some(e_type) = &entity.error_type {
+        quote!(Result<Vec<Self>, #e_type>)
+    } else {
+        quote!(Result<Vec<Self>, sqlx::Error>)
+    };
+
     quote! {
         #vis async fn #fn_name(
-            con: &mut sqlx::PgConnection,
+            conn: &mut sqlx::PgConnection,
             val: &#val
-        ) -> sqlx::Result<Vec<Self>> {
-            sqlx::query_as!(Self, #query, #by_converter)
-                .fetch_all(con)
-                .await
+        ) -> #ret_type {
+            Ok(sqlx::query_as!(Self, #query, #by_converter)
+                .fetch_all(conn)
+                .await?)
         }
     }
 }

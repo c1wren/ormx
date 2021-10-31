@@ -18,6 +18,7 @@ pub enum EntityAttr {
     AfterInsert(ExprPath),
     BeforeDelete(ExprPath),
     AfterDelete(ExprPath),
+    ErrorType(Ident),
 }
 
 impl Parse for EntityAttr {
@@ -40,6 +41,7 @@ impl Parse for EntityAttr {
             "after_insert" => AfterInsert(assign_expr_path(ident.span(), &input)?),
             "before_delete" => BeforeDelete(assign_expr_path(ident.span(), &input)?),
             "after_delete" => AfterDelete(assign_expr_path(ident.span(), &input)?),
+            "error_type" => ErrorType(assign_ident(ident.span(), &input)?),
             other => {
                 return Err(Error::new(
                     ident.span(),

@@ -11,6 +11,7 @@ mod attrs;
 mod delete;
 mod entity;
 mod get;
+
 mod insert;
 mod patch;
 mod set;

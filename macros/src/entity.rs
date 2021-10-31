@@ -56,6 +56,8 @@ pub struct Entity {
     pub after_insert: Option<ExprPath>,
     pub before_delete: Option<ExprPath>,
     pub after_delete: Option<ExprPath>,
+
+    pub error_type: Option<Ident>,
 }
 
 impl Entity {
@@ -172,6 +174,8 @@ impl TryFrom<DeriveInput> for Entity {
         let mut after_insert = None;
         let mut before_delete = None;
         let mut after_delete = None;
+        let mut error_type = None;
+
         for attr in crate::attrs::parse_all::<EntityAttr>(&input.attrs)? {
             match attr {
                 EntityAttr::Table(name) => table_name.replace(name).map_or(Ok(()), duplicate)?,
@@ -206,6 +210,9 @@ impl TryFrom<DeriveInput> for Entity {
                 EntityAttr::AfterInsert(path) => after_insert = Some(path),
                 EntityAttr::BeforeDelete(path) => before_delete = Some(path),
                 EntityAttr::AfterDelete(path) => after_delete = Some(path),
+                EntityAttr::ErrorType(error_ident) => {
+                    error_type = Some(error_ident);
+                }
             }
         }
         let table_name = table_name.ok_or_else(|| missing_attr("table"))?;
@@ -238,6 +245,7 @@ impl TryFrom<DeriveInput> for Entity {
             after_insert,
             before_delete,
             after_delete,
+            error_type,
         })
     }
 }

@@ -1,6 +1,9 @@
 use anyhow::Result;
 use sqlx::{postgres::PgPoolOptions, PgConnection};
 
+mod error;
+use error::TestError;
+
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
@@ -77,46 +80,48 @@ async fn before_patch(
     _model: &Club,
     _patch: &PatchClub,
     _db_pool: &mut PgConnection,
-) -> sqlx::Result<()> {
+) -> Result<(), TestError> {
     println!("before patch");
     Ok(())
 }
 
-async fn after_patch(_model: &Club, _db_pool: &mut PgConnection) -> sqlx::Result<()> {
+async fn after_patch(_model: &Club, _db_pool: &mut PgConnection) -> Result<(), TestError> {
     println!("after patch");
     Ok(())
 }
 
-async fn before_update(_model: &Club, _db_pool: &mut PgConnection) -> sqlx::Result<()> {
+async fn before_update(_model: &Club, _db_pool: &mut PgConnection) -> Result<(), TestError> {
     println!("before update");
     Ok(())
 }
 
-async fn after_update(_model: &Club, _db_pool: &mut PgConnection) -> sqlx::Result<()> {
+async fn after_update(_model: &Club, _db_pool: &mut PgConnection) -> Result<(), TestError> {
     println!("after update");
     Ok(())
 }
 
-async fn before_delete(_model: &Club, _db_pool: &mut PgConnection) -> sqlx::Result<()> {
+async fn before_delete(_model: &Club, _db_pool: &mut PgConnection) -> Result<(), TestError> {
     println!("before delete");
     Ok(())
 }
 
-async fn after_delete(_model: Club, _db_pool: &mut PgConnection) -> sqlx::Result<()> {
+async fn after_delete(_model: Club, _db_pool: &mut PgConnection) -> Result<(), TestError> {
     println!("after delete");
     Ok(())
 }
 
-async fn before_insert(_model: &InsertClub, _db_pool: &mut PgConnection) -> sqlx::Result<()> {
+async fn before_insert(_model: &InsertClub, _db_pool: &mut PgConnection) -> Result<(), TestError> {
     println!("before insert");
     Ok(())
 }
 
-async fn after_insert(_model: &Club, _db_pool: &mut PgConnection) -> sqlx::Result<()> {
+async fn after_insert(_model: &Club, _db_pool: &mut PgConnection) -> Result<(), TestError> {
     println!("after insert");
     Ok(())
 }
 
+// by default, when you derive Entity, you only get the functionality of updating a model
+// derive insertable, patchable, and deletable to have the respective functionality
 #[derive(ormx::Entity, sqlx::FromRow, Debug)]
 #[ormx(
     table = "clubs",
@@ -125,6 +130,7 @@ async fn after_insert(_model: &Club, _db_pool: &mut PgConnection) -> sqlx::Resul
     patchable,
     deletable = "my_delete",
     get_all = "find_all_clubs",
+    error_type = "TestError",
     before_patch = "before_patch",
     after_patch = "after_patch",
     before_update = "before_update",
@@ -141,7 +147,7 @@ struct Club {
     test1: String,
     #[ormx(get_optional = "by_name", set = "update_enum")]
     // use a custom type that is really an i32
-    // custom_type really includes the type in the sqlx query type checking
+    // custom_type forces type inference by sqlx to eliminate errors
     #[ormx(custom_type, convert_as = "i32")]
     test2: TestEnum,
     #[ormx(default)]
@@ -155,5 +161,5 @@ struct Club {
 
 #[allow(unused)]
 fn my_convert(t: &Option<Vec<i32>>) -> Option<&[i32]> {
-    t.as_ref().map(|the_t| the_t.as_slice())
+    t.as_ref().map(Vec::as_slice)
 }

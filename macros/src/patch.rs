@@ -93,7 +93,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
 
     let before_patch = if let Some(before_fn) = &entity.before_patch {
         quote!(
-            #before_fn(self, &patch, &mut *con).await?;
+            #before_fn(self, &patch, &mut *conn).await?;
         )
     } else {
         quote!()
@@ -101,17 +101,17 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
 
     let after_patch = if let Some(after_fn) = &entity.after_patch {
         quote!(
-            #patch_struct_ident::patch(&patch, &mut *con, &self.#id_ident).await?;
+            #patch_struct_ident::patch(&patch, &mut *conn, &self.#id_ident).await?;
 
             #(if let Some(new_value) = patch.#patchable_fields {
                 self.#patchable_fields = new_value;
             })*
 
-            #after_fn(self, con).await?;
+            #after_fn(self, conn).await?;
         )
     } else {
         quote!(
-            #patch_struct_ident::patch(&patch, con, &self.#id_ident).await?;
+            #patch_struct_ident::patch(&patch, conn, &self.#id_ident).await?;
 
             #(if let Some(new_value) = patch.#patchable_fields {
                 self.#patchable_fields = new_value;
@@ -119,13 +119,19 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         )
     };
 
+    let ret_type = if let Some(e_type) = &entity.error_type {
+        quote!(Result<(), #e_type>)
+    } else {
+        quote!(Result<(), sqlx::Error>)
+    };
+
     quote! {
         impl #patch_struct_ident {
             #vis async fn patch(
                 &self,
-                con: &mut sqlx::PgConnection,
+                conn: &mut sqlx::PgConnection,
                 id: &#id_ty,
-            ) -> sqlx::Result<()> {
+            ) -> #ret_type {
                 let mut columns = vec![];
                 let mut count = 2;
 
@@ -138,7 +144,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
                 let mut query = sqlx::query(&sql).bind(id);
                 #(#binding)*
 
-                query.execute(con).await?;
+                query.execute(conn).await?;
 
                 Ok(())
             }
@@ -148,9 +154,9 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         impl #entity_ident {
             #vis async fn patch(
                 &mut self,
-                con: &mut sqlx::PgConnection,
+                conn: &mut sqlx::PgConnection,
                 patch: #patch_struct_ident,
-            ) -> sqlx::Result<()> {
+            ) -> #ret_type {
                 #before_patch
 
                 #after_patch
@@ -165,10 +171,10 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         impl #entity_ident {
             #vis async fn no_trigger_patch(
                 &mut self,
-                con: &mut sqlx::PgConnection,
+                conn: &mut sqlx::PgConnection,
                 patch: #patch_struct_ident,
-            ) -> sqlx::Result<()> {
-                #patch_struct_ident::patch(&patch, con, &self.#id_ident).await?;
+            ) -> #ret_type {
+                #patch_struct_ident::patch(&patch, conn, &self.#id_ident).await?;
 
                 #(if let Some(new_value) = patch.#patchable_fields {
                     self.#patchable_fields = new_value;

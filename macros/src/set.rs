@@ -28,14 +28,20 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
         None => quote! { value },
     };
 
+    let ret_type = if let Some(e_type) = &entity.error_type {
+        quote!(Result<(), #e_type>)
+    } else {
+        quote!(Result<(), sqlx::Error>)
+    };
+
     quote! {
         #vis async fn #fn_name(
             &mut self,
-            con: &mut sqlx::PgConnection,
+            conn: &mut sqlx::PgConnection,
             value: #field_ty
-        ) -> sqlx::Result<()> {
+        ) -> #ret_type {
             sqlx::query!(#query, #value_converter, &self.#pkey)
-                .execute(con)
+                .execute(conn)
                 .await?;
             self.#field_ident = value;
             Ok(())

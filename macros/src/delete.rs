@@ -35,7 +35,7 @@ fn delete_self(entity: &Entity, fn_name: &Ident) -> TokenStream {
 
     let before_delete = if let Some(before_fn) = &entity.before_delete {
         quote!(
-            #before_fn(&self, &mut *con).await?;
+            #before_fn(&self, &mut *conn).await?;
         )
     } else {
         quote!()
@@ -43,22 +43,28 @@ fn delete_self(entity: &Entity, fn_name: &Ident) -> TokenStream {
 
     let after_delete = if let Some(after_fn) = &entity.after_delete {
         quote!(
-            sqlx::query!(#sql, self.#id_ident).execute(&mut *con).await?;
+            sqlx::query!(#sql, self.#id_ident).execute(&mut *conn).await?;
 
-            #after_fn(self, con).await?;
+            #after_fn(self, conn).await?;
         )
     } else {
         quote!(
-            sqlx::query!(#sql, self.#id_ident).execute(con).await?;
+            sqlx::query!(#sql, self.#id_ident).execute(conn).await?;
         )
+    };
+
+    let ret_type = if let Some(e_type) = &entity.error_type {
+        quote!(Result<(), #e_type>)
+    } else {
+        quote!(Result<(), sqlx::Error>)
     };
 
     quote! {
         /// Deletes a row from the database.
         #vis async fn #fn_name(
             self,
-            con: &mut sqlx::PgConnection,
-        ) -> sqlx::Result<()> {
+            conn: &mut sqlx::PgConnection,
+        ) -> #ret_type {
             #before_delete
 
             #after_delete
@@ -76,14 +82,20 @@ fn delete_by(entity: &Entity, val: &EntityField, fn_name: &Ident) -> TokenStream
         entity.table_name, val.column_name
     );
 
+    let ret_type = if let Some(e_type) = &entity.error_type {
+        quote!(Result<u64, #e_type>)
+    } else {
+        quote!(Result<u64, sqlx::Error>)
+    };
+
     quote! {
         #vis async fn #fn_name(
-            con: &mut sqlx::PgConnection,
+            conn: &mut sqlx::PgConnection,
             val: &#val_ty,
-        ) -> sqlx::Result<u64> {
+        ) -> #ret_type {
             use sqlx::Done;
 
-            let result = sqlx::query!(#sql, by).execute(con).await?;
+            let result = sqlx::query!(#sql, by).execute(conn).await?;
 
             Ok(result.rows_affected())
         }

@@ -52,7 +52,7 @@ fn insert_fn(entity: &Entity) -> TokenStream {
 
     let before_insert = if let Some(before_fn) = &entity.before_insert {
         quote!(
-            #before_fn(&self, &mut *con).await?;
+            #before_fn(&self, &mut *conn).await?;
         )
     } else {
         quote!()
@@ -61,26 +61,32 @@ fn insert_fn(entity: &Entity) -> TokenStream {
     let after_insert = if let Some(after_fn) = &entity.after_insert {
         quote!(
             let rec = sqlx::query_as!(#entity_ident, #insert_sql, #(#query_idents),*)
-                .fetch_one(&mut *con)
+                .fetch_one(&mut *conn)
                 .await?;
 
-            #after_fn(&rec, con).await?;
+            #after_fn(&rec, conn).await?;
         )
     } else {
         quote!(
             let rec = sqlx::query_as!(#entity_ident, #insert_sql, #(#query_idents),*)
-                .fetch_one(con)
+                .fetch_one(conn)
                 .await?;
 
         )
+    };
+
+    let ret_type = if let Some(e_type) = &entity.error_type {
+        quote!(Result<#entity_ident, #e_type>)
+    } else {
+        quote!(Result<#entity_ident, sqlx::Error>)
     };
 
     quote! {
         /// Insert a row into the database.
         #vis async fn insert(
             self,
-            con: &mut sqlx::PgConnection,
-        ) -> sqlx::Result<#entity_ident> {
+            conn: &mut sqlx::PgConnection,
+        ) -> #ret_type {
             #before_insert
 
             #after_insert
@@ -93,10 +99,10 @@ fn insert_fn(entity: &Entity) -> TokenStream {
         /// Does not call the before and after triggers.
         #vis async fn no_trigger_insert(
             self,
-            con: &mut sqlx::PgConnection,
-        ) -> sqlx::Result<#entity_ident> {
+            conn: &mut sqlx::PgConnection,
+        ) -> #ret_type {
             let rec = sqlx::query_as!(#entity_ident, #insert_sql, #(#query_idents),*)
-                .fetch_one(con)
+                .fetch_one(conn)
                 .await?;
 
             Ok(rec)

@@ -17,4 +17,4 @@ serde_repr = "0.1"
 chrono = { version = "0.4.12", features = ["serde"] }
 rust_decimal = { version = "1.8.1", features = ["serde-float"] }
 sqlx = { version = "0.5.9", default-features = false, features = [ "runtime-tokio-rustls", "macros", "json", "postgres", "chrono", "decimal", "offline" ] }
-
+thiserror = "1.0.30"
