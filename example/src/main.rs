@@ -85,8 +85,14 @@ async fn before_patch(
     Ok(())
 }
 
-async fn after_patch(_model: &Club, _db_pool: &mut PgConnection) -> Result<(), TestError> {
+async fn after_patch(
+    _model: &Club,
+    _previous: Club,
+    _db_pool: &mut PgConnection,
+) -> Result<(), TestError> {
     println!("after patch");
+    dbg!(_model);
+    dbg!(_previous);
     Ok(())
 }
 
@@ -95,8 +101,14 @@ async fn before_update(_model: &Club, _db_pool: &mut PgConnection) -> Result<(),
     Ok(())
 }
 
-async fn after_update(_model: &Club, _db_pool: &mut PgConnection) -> Result<(), TestError> {
+async fn after_update(
+    _model: &Club,
+    _previous: Club,
+    _db_pool: &mut PgConnection,
+) -> Result<(), TestError> {
     println!("after update");
+    dbg!(_model);
+    dbg!(_previous);
     Ok(())
 }
 

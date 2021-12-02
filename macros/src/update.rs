@@ -1,4 +1,4 @@
-use crate::{attrs::ConvertType, Entity};
+use crate::{attrs::ConvertType, entity::EntityField, Entity};
 use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -37,6 +37,17 @@ pub fn update(entity: &Entity) -> TokenStream {
         }
     });
 
+    let columns = entity
+        .fields
+        .iter()
+        .map(EntityField::fmt_for_select)
+        .join(",");
+
+    let before_value_sql = format!(
+        "SELECT {} FROM {} WHERE {} = $1",
+        columns, entity.table_name, entity.id.column_name
+    );
+
     let before_update = if let Some(before_fn) = &entity.before_update {
         quote!(
             #before_fn(self, &mut *conn).await?;
@@ -49,9 +60,13 @@ pub fn update(entity: &Entity) -> TokenStream {
 
     let after_update = if let Some(after_fn) = &entity.after_update {
         quote!(
+            let previous = sqlx::query_as!(Self, #before_value_sql, self.id)
+                .fetch_one(&mut *conn)
+                .await?;
+
             #sqlx_call.execute(&mut *conn).await?;
 
-            #after_fn(self, conn).await?;
+            #after_fn(self, previous, conn).await?;
         )
     } else {
         quote!(

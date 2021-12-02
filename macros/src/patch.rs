@@ -1,4 +1,5 @@
 use crate::{attrs::ConvertType, Entity, EntityField};
+use itertools::Itertools;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::Ident;
@@ -91,6 +92,17 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         )
     });
 
+    let columns = entity
+        .fields
+        .iter()
+        .map(EntityField::fmt_for_select)
+        .join(",");
+
+    let before_value_sql = format!(
+        "SELECT {} FROM {} WHERE {} = $1",
+        columns, entity.table_name, entity.id.column_name
+    );
+
     let before_patch = if let Some(before_fn) = &entity.before_patch {
         quote!(
             #before_fn(self, &patch, &mut *conn).await?;
@@ -101,13 +113,17 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
 
     let after_patch = if let Some(after_fn) = &entity.after_patch {
         quote!(
+            let previous = sqlx::query_as!(Self, #before_value_sql, self.id)
+                .fetch_one(&mut *conn)
+                .await?;
+
             #patch_struct_ident::patch(&patch, &mut *conn, &self.#id_ident).await?;
 
             #(if let Some(new_value) = patch.#patchable_fields {
                 self.#patchable_fields = new_value;
             })*
 
-            #after_fn(self, conn).await?;
+            #after_fn(self, previous, conn).await?;
         )
     } else {
         quote!(

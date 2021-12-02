@@ -41,7 +41,7 @@ fn get_all(entity: &Entity) -> TokenStream2 {
         Some(ident) => ident,
         None => return quote!(),
     };
-    let sql = build_query(entity, None);
+    let sql = build_select_query(entity, None);
     let vis = &entity.vis;
 
     let ret_type = if let Some(e_type) = &entity.error_type {
@@ -64,7 +64,7 @@ fn get_all(entity: &Entity) -> TokenStream2 {
 fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     let val = &field.ty;
     let vis = &entity.vis;
-    let query = build_query(entity, Some(field));
+    let query = build_select_query(entity, Some(field));
 
     let by_converter = match &field.convert {
         Some(ConvertType::As(t)) => quote! { *val as #t },
@@ -93,7 +93,7 @@ fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
 fn optional(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     let val = &field.ty;
     let vis = &entity.vis;
-    let query = build_query(entity, Some(field));
+    let query = build_select_query(entity, Some(field));
 
     let by_converter = match &field.convert {
         Some(ConvertType::As(t)) => quote! { *val as #t },
@@ -122,7 +122,7 @@ fn optional(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStrea
 fn many(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     let val = &field.ty;
     let vis = &entity.vis;
-    let query = build_query(entity, Some(field));
+    let query = build_select_query(entity, Some(field));
 
     let by_converter = match &field.convert {
         Some(ConvertType::As(t)) => quote! { *val as #t },
@@ -148,7 +148,7 @@ fn many(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     }
 }
 
-fn build_query(entity: &Entity, val: Option<&EntityField>) -> String {
+fn build_select_query(entity: &Entity, val: Option<&EntityField>) -> String {
     let columns = entity
         .fields
         .iter()
