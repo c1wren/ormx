@@ -3,7 +3,7 @@ use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 
 pub fn delete(entity: &Entity) -> TokenStream {
-    let delete = delete_self(entity);
+    let delete = entity.delete.as_ref().map(|_| delete_self(entity));
 
     let delete_by = entity
         .fields
