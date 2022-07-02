@@ -103,6 +103,8 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         columns, entity.table_name, entity.id.column_name
     );
 
+    let has_trigger = entity.before_patch.is_some() || entity.after_patch.is_some();
+
     let before_patch = if let Some(before_fn) = &entity.before_patch {
         quote!(
             #before_fn(self, &patch, &mut *conn).await?;
@@ -139,6 +141,31 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         quote!(Result<(), #e_type>)
     } else {
         quote!(Result<(), sqlx::Error>)
+    };
+
+    let no_trigger_variant = if has_trigger {
+        quote! {
+            /// Patches row by updating only the specific rows that have changed.
+            ///
+            /// Does not call the before and after triggers.
+            impl #entity_ident {
+                #vis async fn no_trigger_patch(
+                    &mut self,
+                    conn: &mut sqlx::PgConnection,
+                    patch: #patch_struct_ident,
+                ) -> #ret_type {
+                    #patch_struct_ident::patch(&patch, conn, &self.#id_ident).await?;
+
+                    #(if let Some(new_value) = patch.#patchable_fields {
+                        self.#patchable_fields = new_value;
+                    })*
+
+                    Ok(())
+                }
+            }
+        }
+    } else {
+        quote!()
     };
 
     quote! {
@@ -181,23 +208,6 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
             }
         }
 
-        /// Patches row by updating only the specific rows that have changed.
-        ///
-        /// Does not call the before and after triggers.
-        impl #entity_ident {
-            #vis async fn no_trigger_patch(
-                &mut self,
-                conn: &mut sqlx::PgConnection,
-                patch: #patch_struct_ident,
-            ) -> #ret_type {
-                #patch_struct_ident::patch(&patch, conn, &self.#id_ident).await?;
-
-                #(if let Some(new_value) = patch.#patchable_fields {
-                    self.#patchable_fields = new_value;
-                })*
-
-                Ok(())
-            }
-        }
+        #no_trigger_variant
     }
 }

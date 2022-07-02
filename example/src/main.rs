@@ -40,7 +40,7 @@ async fn main() -> Result<()> {
     // test get_optional
     if let Some(club) = Club::by_id(&mut *db_pool.acquire().await?, &1).await? {
         // fetch by_id and then delete that club
-        club.my_delete(&mut *db_pool.acquire().await?).await?;
+        club.delete(&mut *db_pool.acquire().await?).await?;
         println!("deleted club");
     }
 
@@ -61,7 +61,7 @@ async fn main() -> Result<()> {
 
     for club in clubs {
         dbg!(&club);
-        club.my_delete(&mut *db_pool.acquire().await?).await?;
+        club.delete(&mut *db_pool.acquire().await?).await?;
     }
 
     Ok(())
@@ -140,7 +140,7 @@ async fn after_insert(_model: &Club, _db_pool: &mut PgConnection) -> Result<(), 
     id = "id",
     insertable,
     patchable,
-    deletable = "my_delete",
+    deletable,
     get_all = "find_all_clubs",
     error_type = "TestError",
     before_patch = "before_patch",

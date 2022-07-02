@@ -50,6 +50,8 @@ fn insert_fn(entity: &Entity) -> TokenStream {
     let entity_ident = &entity.ident;
     let insert_sql = insert_sql(entity);
 
+    let has_trigger = entity.before_insert.is_some() || entity.after_insert.is_some();
+
     let before_insert = if let Some(before_fn) = &entity.before_insert {
         quote!(
             #before_fn(&self, &mut *conn).await?;
@@ -81,6 +83,26 @@ fn insert_fn(entity: &Entity) -> TokenStream {
         quote!(Result<#entity_ident, sqlx::Error>)
     };
 
+    let no_trigger_variant = if has_trigger {
+        quote! {
+            /// Insert a row into the database.
+            ///
+            /// Does not call the before and after triggers.
+            #vis async fn no_trigger_insert(
+                self,
+                conn: &mut sqlx::PgConnection,
+            ) -> #ret_type {
+                let rec = sqlx::query_as!(#entity_ident, #insert_sql, #(#query_idents),*)
+                    .fetch_one(conn)
+                    .await?;
+
+                Ok(rec)
+            }
+        }
+    } else {
+        quote!()
+    };
+
     quote! {
         /// Insert a row into the database.
         #vis async fn insert(
@@ -94,19 +116,7 @@ fn insert_fn(entity: &Entity) -> TokenStream {
             Ok(rec)
         }
 
-        /// Insert a row into the database.
-        ///
-        /// Does not call the before and after triggers.
-        #vis async fn no_trigger_insert(
-            self,
-            conn: &mut sqlx::PgConnection,
-        ) -> #ret_type {
-            let rec = sqlx::query_as!(#entity_ident, #insert_sql, #(#query_idents),*)
-                .fetch_one(conn)
-                .await?;
-
-            Ok(rec)
-        }
+        #no_trigger_variant
     }
 }
 

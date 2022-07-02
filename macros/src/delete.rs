@@ -3,10 +3,7 @@ use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 
 pub fn delete(entity: &Entity) -> TokenStream {
-    let delete = entity
-        .delete
-        .as_ref()
-        .map(|delete_fn| delete_self(entity, delete_fn));
+    let delete = delete_self(entity);
 
     let delete_by = entity
         .fields
@@ -25,13 +22,15 @@ pub fn delete(entity: &Entity) -> TokenStream {
     }
 }
 
-fn delete_self(entity: &Entity, fn_name: &Ident) -> TokenStream {
+fn delete_self(entity: &Entity) -> TokenStream {
     let vis = &entity.vis;
     let id_ident = &entity.id.ident;
     let sql = format!(
         "DELETE FROM {} WHERE {} = $1",
         entity.table_name, entity.id.column_name
     );
+
+    let has_trigger = entity.before_delete.is_some() || entity.after_delete.is_some();
 
     let before_delete = if let Some(before_fn) = &entity.before_delete {
         quote!(
@@ -59,9 +58,24 @@ fn delete_self(entity: &Entity, fn_name: &Ident) -> TokenStream {
         quote!(Result<(), sqlx::Error>)
     };
 
+    let no_trigger_variant = if has_trigger {
+        quote! {
+            #vis async fn no_trigger_delete(
+                self,
+                conn: &mut sqlx::PgConnection,
+            ) -> #ret_type {
+                sqlx::query!(#sql, self.#id_ident).execute(conn).await?;
+
+                Ok(())
+            }
+        }
+    } else {
+        quote!()
+    };
+
     quote! {
         /// Deletes a row from the database.
-        #vis async fn #fn_name(
+        #vis async fn delete(
             self,
             conn: &mut sqlx::PgConnection,
         ) -> #ret_type {
@@ -71,6 +85,8 @@ fn delete_self(entity: &Entity, fn_name: &Ident) -> TokenStream {
 
             Ok(())
         }
+
+        #no_trigger_variant
     }
 }
 

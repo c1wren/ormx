@@ -58,6 +58,8 @@ pub fn update(entity: &Entity) -> TokenStream {
 
     let sqlx_call = quote!(sqlx::query!(#sql, self.#id_ident, #(#updatable_fields,)*));
 
+    let has_trigger = entity.after_update.is_some() || entity.before_update.is_some();
+
     let after_update = if let Some(after_fn) = &entity.after_update {
         quote!(
             let previous = sqlx::query_as!(Self, #before_value_sql, self.id)
@@ -80,6 +82,24 @@ pub fn update(entity: &Entity) -> TokenStream {
         quote!(Result<(), sqlx::Error>)
     };
 
+    let no_trigger_variant = if has_trigger {
+        quote! {
+            /// Updates a given row in the database by updating all fields, even if some fields haven't been changed.
+            ///
+            /// Does not call the before and after triggers.
+            #vis async fn no_trigger_update(
+                &self,
+                conn: &mut sqlx::PgConnection
+            ) -> #ret_type {
+                #sqlx_call.execute(conn).await?;
+
+                Ok(())
+            }
+        }
+    } else {
+        quote!()
+    };
+
     quote! {
         /// Updates a given row in the database by updating all fields, even if some fields haven't been changed.
         #vis async fn update(
@@ -93,17 +113,6 @@ pub fn update(entity: &Entity) -> TokenStream {
             Ok(())
         }
 
-        /// Updates a given row in the database by updating all fields, even if some fields haven't been changed.
-        ///
-        /// Does not call the before and after triggers.
-        #vis async fn no_trigger_update(
-            &self,
-            conn: &mut sqlx::PgConnection
-        ) -> #ret_type {
-            #sqlx_call.execute(conn).await?;
-
-            Ok(())
-        }
-
+        #no_trigger_variant
     }
 }
