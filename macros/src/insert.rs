@@ -134,8 +134,8 @@ fn insert_sql(entity: &Entity) -> String {
         insertable
             .iter()
             .map(|field| field.column_name.replace("r#", ""))
-            .join(","),
-        (1..=insertable.len()).map(|i| format!("${}", i)).join(","),
+            .join(", "),
+        (1..=insertable.len()).map(|i| format!("${}", i)).join(", "),
         columns
     )
 }

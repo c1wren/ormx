@@ -1,15 +1,15 @@
 [package]
 name = "macros"
-version = "0.1.0"
-authors = ["Moritz Bischof <moritz.bischof@aleph-alpha.de>"]
-edition = "2018"
+version = "0.2.0"
+authors = ["Caleb Wren <caleb_wren@me.com>"]
+edition = "2021"
 
 [lib]
 proc-macro = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-syn = { version = "1.0.58", features = ["full"] }
-quote = "1.0.8"
-proc-macro2 = "1.0.24"
-itertools = "0.10.0"
+syn = "2.0"
+quote = "1.0"
+proc-macro2 = "1.0"
+itertools = "0.11.0"

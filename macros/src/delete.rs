@@ -74,7 +74,7 @@ fn delete_self(entity: &Entity) -> TokenStream {
     };
 
     quote! {
-        /// Deletes a row from the database.
+        /// Deletes the entity with the specified primary key from the database.
         #vis async fn delete(
             self,
             conn: &mut sqlx::PgConnection,

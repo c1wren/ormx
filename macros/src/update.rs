@@ -41,7 +41,7 @@ pub fn update(entity: &Entity) -> TokenStream {
         .fields
         .iter()
         .map(EntityField::fmt_for_select)
-        .join(",");
+        .join(", ");
 
     let before_value_sql = format!(
         "SELECT {} FROM {} WHERE {} = $1",
@@ -84,7 +84,9 @@ pub fn update(entity: &Entity) -> TokenStream {
 
     let no_trigger_variant = if has_trigger {
         quote! {
-            /// Updates a given row in the database by updating all fields, even if some fields haven't been changed.
+            /// Updates the row in the database specified by the primary key.
+            ///
+            /// This will update every field except the primary key field. `Patch` should be used if only updating some of the fields.
             ///
             /// Does not call the before and after triggers.
             #vis async fn no_trigger_update(
@@ -101,8 +103,10 @@ pub fn update(entity: &Entity) -> TokenStream {
     };
 
     quote! {
-        /// Updates a given row in the database by updating all fields, even if some fields haven't been changed.
-        #vis async fn update(
+            /// Updates the row in the database specified by the primary key.
+            ///
+            /// This will update every field except the primary key field. `Patch` should be used if only updating some of the fields.
+            #vis async fn update(
             &self,
             conn: &mut sqlx::PgConnection
         ) -> #ret_type {

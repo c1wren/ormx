@@ -153,7 +153,7 @@ fn build_select_query(entity: &Entity, val: Option<&EntityField>) -> String {
         .fields
         .iter()
         .map(EntityField::fmt_for_select)
-        .join(",");
+        .join(", ");
 
     if let Some(val) = val {
         format!(

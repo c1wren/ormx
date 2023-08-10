@@ -218,7 +218,7 @@ impl TryFrom<DeriveInput> for Entity {
         let table_name = table_name.ok_or_else(|| missing_attr("table"))?;
         let id = id.ok_or_else(|| missing_attr("id"))?;
 
-        let fields = get_fields(input.span(), &data_struct)?
+        let fields = get_fields(input.span(), data_struct)?
             .into_iter()
             .map(EntityField::try_from)
             .collect::<Result<Vec<_>>>()?;
@@ -267,6 +267,6 @@ fn duplicate<T>(_: T) -> Result<()> {
 fn missing_attr(name: &str) -> Error {
     Error::new(
         Span::call_site(),
-        &format!(r#"missing #[ormx({} = "..")) attribute"#, name),
+        format!(r#"missing #[ormx({} = "..")) attribute"#, name),
     )
 }

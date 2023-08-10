@@ -11,11 +11,11 @@ pub fn patch(entity: &Entity) -> TokenStream {
     };
 
     if entity.patchable_fields().count() == 0 {
-        panic!("#[ormx(patchable)] does not apply no any field!");
+        panic!("#[ormx(patchable)] does not apply to any field!");
     }
 
-    let patch_struct = patch_struct(entity, &patch_struct_ident);
-    let methods = methods(entity, &patch_struct_ident);
+    let patch_struct = patch_struct(entity, patch_struct_ident);
+    let methods = methods(entity, patch_struct_ident);
 
     quote! {
         #patch_struct
@@ -96,7 +96,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         .fields
         .iter()
         .map(EntityField::fmt_for_select)
-        .join(",");
+        .join(", ");
 
     let before_value_sql = format!(
         "SELECT {} FROM {} WHERE {} = $1",
@@ -145,7 +145,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
 
     let no_trigger_variant = if has_trigger {
         quote! {
-            /// Patches row by updating only the specific rows that have changed.
+            /// Updates the row as specified by the entity's primary key with only the fields that are included in the patch.
             ///
             /// Does not call the before and after triggers.
             impl #entity_ident {
@@ -193,7 +193,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
             }
         }
 
-        /// Patches row by updating only the specific rows that have changed.
+        /// Updates the row as specified by the entity's primary key with only the fields that are included in the patch.
         impl #entity_ident {
             #vis async fn patch(
                 &mut self,

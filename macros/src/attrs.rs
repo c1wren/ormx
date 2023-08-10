@@ -45,7 +45,7 @@ impl Parse for EntityAttr {
             other => {
                 return Err(Error::new(
                     ident.span(),
-                    &format!("unknown ormx attribute: `{}`", other),
+                    format!("unknown ormx attribute: `{}`", other),
                 ))
             }
         };
@@ -97,7 +97,7 @@ impl Parse for FieldAttr {
             other => {
                 return Err(Error::new(
                     ident.span(),
-                    &format!("unknown ormx attribute: `{}`", other),
+                    format!("unknown ormx attribute: `{}`", other),
                 ))
             }
         };
@@ -108,7 +108,7 @@ impl Parse for FieldAttr {
 pub fn parse_all<P: Parse>(attrs: &[Attribute]) -> Result<Vec<P>> {
     let all = attrs
         .iter()
-        .filter(|attr| attr.path.is_ident("ormx"))
+        .filter(|attr| attr.path().is_ident("ormx"))
         .map(|attr| attr.parse_args_with(Punctuated::<P, Token![,]>::parse_separated_nonempty))
         .collect::<Result<Vec<_>>>()?
         .into_iter()
@@ -119,15 +119,15 @@ pub fn parse_all<P: Parse>(attrs: &[Attribute]) -> Result<Vec<P>> {
 }
 
 fn assign<V: Parse>(span: Span, input: &ParseStream) -> Result<V> {
-    opt_assign(&input)?.ok_or_else(|| Error::new(span, "missing value"))
+    opt_assign(input)?.ok_or_else(|| Error::new(span, "missing value"))
 }
 
 fn assign_ident(span: Span, input: &ParseStream) -> Result<Ident> {
-    opt_assign_ident(&input)?.ok_or_else(|| Error::new(span, "missing value"))
+    opt_assign_ident(input)?.ok_or_else(|| Error::new(span, "missing value"))
 }
 
 fn opt_assign_ident(input: &ParseStream) -> Result<Option<Ident>> {
-    if let Some(lit_str) = opt_assign(&input)? {
+    if let Some(lit_str) = opt_assign(input)? {
         let tokens = spanned_tokens(&lit_str)?;
         Ok(Some(syn::parse2(tokens)?))
     } else {
@@ -145,7 +145,7 @@ fn opt_assign<V: Parse>(input: &ParseStream) -> Result<Option<V>> {
 }
 
 fn opt_assign_bool(input: &ParseStream) -> Result<Option<bool>> {
-    let parsed = opt_assign::<LitBool>(&input)?.map(|lit| lit.value);
+    let parsed = opt_assign::<LitBool>(input)?.map(|lit| lit.value);
     Ok(parsed)
 }
 
