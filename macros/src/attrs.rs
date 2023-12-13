@@ -6,6 +6,7 @@ use syn::{Attribute, Error, ExprPath, LitBool, LitStr, Result, Token};
 pub enum EntityAttr {
     Table(String),
     Id(Ident),
+    Update(Option<Ident>),
     Insertable(Option<Ident>),
     Patchable(Option<Ident>),
     GetAll(Option<Ident>),
@@ -29,6 +30,7 @@ impl Parse for EntityAttr {
         let attr = match &*ident.to_string() {
             "table" => Table(assign_string(ident.span(), &input)?),
             "id" => Id(assign_ident(ident.span(), &input)?),
+            "update" => Update(opt_assign_ident(&input)?),
             "insertable" => Insertable(opt_assign_ident(&input)?),
             "patchable" => Patchable(opt_assign_ident(&input)?),
             "deletable" => Deletable(opt_assign_ident(&input)?),

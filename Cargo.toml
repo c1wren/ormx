@@ -1,2 +1,3 @@
 [workspace]
 members = ["macros", "ormx", "example"]
+resolver = "2"

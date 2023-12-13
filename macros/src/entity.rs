@@ -45,6 +45,7 @@ pub struct Entity {
     pub get_all: Option<Ident>,
     pub delete: Option<Ident>,
 
+    pub update: Ident,
     pub insert: Option<Ident>,
     pub patch: Option<Ident>,
 
@@ -162,6 +163,7 @@ impl TryFrom<DeriveInput> for Entity {
 
         let mut table_name = None;
         let mut id = None;
+        let mut update = Ident::new("update", Span::call_site());
         let mut insert = None;
         let mut patch = None;
         let mut get_all = None;
@@ -180,6 +182,11 @@ impl TryFrom<DeriveInput> for Entity {
             match attr {
                 EntityAttr::Table(name) => table_name.replace(name).map_or(Ok(()), duplicate)?,
                 EntityAttr::Id(new_id) => id.replace(new_id).map_or(Ok(()), duplicate)?,
+                EntityAttr::Update(fn_name) => {
+                    if let Some(fn_name) = fn_name {
+                        update = fn_name;
+                    }
+                }
                 EntityAttr::Insertable(struct_ident) => {
                     let struct_ident = struct_ident.unwrap_or_else(|| {
                         Ident::new(&format!("Insert{}", ident), Span::call_site())
@@ -233,6 +240,7 @@ impl TryFrom<DeriveInput> for Entity {
             fields,
             ident,
             vis: input.vis,
+            update,
             insert,
             patch,
             get_all,

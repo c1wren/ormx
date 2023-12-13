@@ -1,6 +1,6 @@
 [package]
 name = "ormx"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Caleb Wren <caleb_wren@me.com>"]
 edition = "2021"
 

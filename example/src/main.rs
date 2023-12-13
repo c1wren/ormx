@@ -50,7 +50,7 @@ async fn main() -> Result<()> {
             .await?;
         dbg!(&club);
         club.name = "Testing 123".into();
-        club.update(&mut *db_pool.acquire().await?).await?;
+        club.my_update(&mut *db_pool.acquire().await?).await?;
         dbg!(club);
     } else {
         println!("club not found")
@@ -138,6 +138,7 @@ async fn after_insert(_model: &Club, _db_pool: &mut PgConnection) -> Result<(), 
 #[ormx(
     table = "clubs",
     id = "id",
+    update = "my_update",
     insertable,
     patchable,
     deletable,
