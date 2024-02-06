@@ -19,7 +19,7 @@ async fn main() -> Result<()> {
     // returns a Club
     let mut club: Club = InsertClub {
         name: "test 4".into(),
-        test1: "test 4".into(),
+        test_rename: "test 4".into(),
         test2: TestEnum::Test2,
         test4: Some(vec![1, 2, 3, 4]),
         r#type: 3,
@@ -157,7 +157,8 @@ struct Club {
     #[ormx(get_optional = "by_id")]
     id: i32,
     name: String,
-    test1: String,
+    #[ormx(rename = "test1")]
+    test_rename: String,
     #[ormx(get_optional = "by_name", set = "update_enum")]
     // use a custom type that is really an i32
     // custom_type forces type inference by sqlx to eliminate errors

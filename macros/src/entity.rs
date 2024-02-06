@@ -28,10 +28,12 @@ impl EntityField {
         let column_name = self.column_name.to_string().replace("r#", "");
 
         if self.custom_type {
-            return format!(r#"{} AS "{}: _""#, column_name, ident);
+            format!(r#"{} AS "{}: _""#, column_name, ident)
+        } else if ident != column_name {
+            format!("{} AS {}", column_name, ident)
+        } else {
+            ident
         }
-
-        ident
     }
 }
 
