@@ -61,8 +61,6 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         .patchable_fields()
         .map(|field| &field.ident)
         .collect::<Vec<_>>();
-    let id_ty = &entity.id.ty;
-    let id_ident = &entity.id.ident;
     let entity_ident = &entity.ident;
     let table_name = &entity.table_name;
     let vis = &entity.vis;
@@ -98,10 +96,20 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         .map(EntityField::fmt_for_select)
         .join(", ");
 
-    let before_value_sql = format!(
-        "SELECT {} FROM {} WHERE {} = $1",
-        columns, entity.table_name, entity.id.column_name
-    );
+    let primary_keys: Vec<&EntityField> = entity.fields.iter().filter(|x| x.is_key).collect();
+    let num_keys = primary_keys.len() + 1;
+
+    let mut patch_sql_statement = String::from("UPDATE {} SET {} WHERE");
+    let mut before_patch_sql = format!("SELECT {} FROM {} WHERE", columns, entity.table_name);
+    for (index, key) in primary_keys.iter().enumerate() {
+        let condition = format!(" {} = ${}", key.column_name, index + 1);
+        before_patch_sql.push_str(condition.as_str());
+        patch_sql_statement.push_str(condition.as_str());
+        if index + 1 != primary_keys.len() {
+            before_patch_sql.push_str(" AND");
+            patch_sql_statement.push_str(" AND");
+        }
+    }
 
     let has_trigger = entity.before_patch.is_some() || entity.after_patch.is_some();
 
@@ -113,13 +121,35 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         quote!()
     };
 
+    let keys = primary_keys.iter().map(|x| (&x.ident, &x.ty));
+
+    let mut items = Vec::new();
+    for (ident, _) in keys.clone() {
+        let stream = quote! {
+            &self.#ident
+        };
+
+        items.push(stream);
+    }
+
+    let mut fn_items = Vec::new();
+    for (ident, ty) in keys {
+        let stream = quote! {
+            #ident: &#ty
+        };
+
+        fn_items.push(stream);
+    }
+
+    let ident_keys: Vec<&Ident> = primary_keys.iter().map(|x| &x.ident).collect();
+
     let after_patch = if let Some(after_fn) = &entity.after_patch {
         quote!(
-            let previous = sqlx::query_as!(Self, #before_value_sql, self.id)
+            let previous = sqlx::query_as!(Self, #before_patch_sql, #(self.#ident_keys),*)
                 .fetch_one(&mut *conn)
                 .await?;
 
-            #patch_struct_ident::patch(&patch, &mut *conn, &self.#id_ident).await?;
+            #patch_struct_ident::patch(&patch, &mut *conn, #( #items ),*).await?;
 
             #(if let Some(new_value) = patch.#patchable_fields {
                 self.#patchable_fields = new_value;
@@ -129,7 +159,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         )
     } else {
         quote!(
-            #patch_struct_ident::patch(&patch, conn, &self.#id_ident).await?;
+            #patch_struct_ident::patch(&patch, conn, #( #items ),*).await?;
 
             #(if let Some(new_value) = patch.#patchable_fields {
                 self.#patchable_fields = new_value;
@@ -154,7 +184,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
                     conn: &mut sqlx::PgConnection,
                     patch: #patch_struct_ident,
                 ) -> #ret_type {
-                    #patch_struct_ident::patch(&patch, conn, &self.#id_ident).await?;
+                    #patch_struct_ident::patch(&patch, conn, #( #items ),*).await?;
 
                     #(if let Some(new_value) = patch.#patchable_fields {
                         self.#patchable_fields = new_value;
@@ -173,18 +203,18 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
             #vis async fn patch(
                 &self,
                 conn: &mut sqlx::PgConnection,
-                id: &#id_ty,
+                #( #fn_items ),*,
             ) -> #ret_type {
                 let mut columns = vec![];
-                let mut count = 2;
+                let mut count = #num_keys;
 
                 #(#column_building)*
 
                 let columns = columns.join(", ");
 
-                let sql = format!("UPDATE {} SET {} WHERE id = $1", #table_name, columns);
+                let sql = format!(#patch_sql_statement, #table_name, columns);
 
-                let mut query = sqlx::query(&sql).bind(id);
+                let mut query = sqlx::query(&sql)#(.bind(#ident_keys))*;
                 #(#binding)*
 
                 query.execute(conn).await?;

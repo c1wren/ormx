@@ -76,85 +76,28 @@ pub enum TestEnum {
     Test4 = 4,
 }
 
-async fn before_patch(
-    _model: &Club,
-    _patch: &PatchClub,
-    _db_pool: &mut PgConnection,
-) -> Result<(), TestError> {
-    println!("before patch");
-    Ok(())
-}
-
-async fn after_patch(
-    _model: &Club,
-    _previous: Club,
-    _db_pool: &mut PgConnection,
-) -> Result<(), TestError> {
-    println!("after patch");
-    dbg!(_model);
-    dbg!(_previous);
-    Ok(())
-}
-
-async fn before_update(_model: &Club, _db_pool: &mut PgConnection) -> Result<(), TestError> {
-    println!("before update");
-    Ok(())
-}
-
-async fn after_update(
-    _model: &Club,
-    _previous: Club,
-    _db_pool: &mut PgConnection,
-) -> Result<(), TestError> {
-    println!("after update");
-    dbg!(_model);
-    dbg!(_previous);
-    Ok(())
-}
-
-async fn before_delete(_model: &Club, _db_pool: &mut PgConnection) -> Result<(), TestError> {
-    println!("before delete");
-    Ok(())
-}
-
-async fn after_delete(_model: Club, _db_pool: &mut PgConnection) -> Result<(), TestError> {
-    println!("after delete");
-    Ok(())
-}
-
-async fn before_insert(_model: &InsertClub, _db_pool: &mut PgConnection) -> Result<(), TestError> {
-    println!("before insert");
-    Ok(())
-}
-
-async fn after_insert(_model: &Club, _db_pool: &mut PgConnection) -> Result<(), TestError> {
-    println!("after insert");
-    Ok(())
-}
-
 // by default, when you derive Entity, you only get the functionality of updating a model
 // derive insertable, patchable, and deletable to have the respective functionality
 #[derive(ormx::Entity, sqlx::FromRow, Debug)]
 #[ormx(
     table = "clubs",
-    id = "id",
     update = "my_update",
     insertable,
     patchable,
     deletable,
     get_all = "find_all_clubs",
     error_type = "TestError",
-    before_patch = "before_patch",
-    after_patch = "after_patch",
-    before_update = "before_update",
-    after_update = "after_update",
-    before_insert = "before_insert",
-    after_insert = "after_insert",
-    before_delete = "before_delete",
-    after_delete = "after_delete"
+    before_patch = "Club::before_patch",
+    after_patch = "Club::after_patch",
+    before_update = "Club::before_update",
+    after_update = "Club::after_update",
+    before_insert = "Club::before_insert",
+    after_insert = "Club::after_insert",
+    before_delete = "Club::before_delete",
+    after_delete = "Club::after_delete"
 )]
 struct Club {
-    #[ormx(get_optional = "by_id")]
+    #[ormx(key, default, get_optional = "by_id")]
     id: i32,
     name: String,
     #[ormx(rename = "test1")]
@@ -173,7 +116,163 @@ struct Club {
     r#type: i32,
 }
 
+impl Club {
+    async fn before_patch(
+        _model: &Club,
+        _patch: &PatchClub,
+        _db_pool: &mut PgConnection,
+    ) -> Result<(), TestError> {
+        println!("before patch");
+        Ok(())
+    }
+
+    async fn after_patch(
+        _model: &Club,
+        _previous: Club,
+        _db_pool: &mut PgConnection,
+    ) -> Result<(), TestError> {
+        println!("after patch");
+        dbg!(_model);
+        dbg!(_previous);
+        Ok(())
+    }
+
+    async fn before_update(_model: &Club, _db_pool: &mut PgConnection) -> Result<(), TestError> {
+        println!("before update");
+        Ok(())
+    }
+
+    async fn after_update(
+        _model: &Club,
+        _previous: Club,
+        _db_pool: &mut PgConnection,
+    ) -> Result<(), TestError> {
+        println!("after update");
+        dbg!(_model);
+        dbg!(_previous);
+        Ok(())
+    }
+
+    async fn before_delete(_model: &Club, _db_pool: &mut PgConnection) -> Result<(), TestError> {
+        println!("before delete");
+        Ok(())
+    }
+
+    async fn after_delete(_model: Club, _db_pool: &mut PgConnection) -> Result<(), TestError> {
+        println!("after delete");
+        Ok(())
+    }
+
+    async fn before_insert(
+        _model: &InsertClub,
+        _db_pool: &mut PgConnection,
+    ) -> Result<(), TestError> {
+        println!("before insert");
+        Ok(())
+    }
+
+    async fn after_insert(_model: &Club, _db_pool: &mut PgConnection) -> Result<(), TestError> {
+        println!("after insert");
+        Ok(())
+    }
+}
+
 #[allow(unused)]
 fn my_convert(t: &Option<Vec<i32>>) -> Option<&[i32]> {
     t.as_ref().map(Vec::as_slice)
+}
+
+// by default, when you derive Entity, you only get the functionality of updating a model
+// derive insertable, patchable, and deletable to have the respective functionality
+#[derive(ormx::Entity, sqlx::FromRow, Debug)]
+#[ormx(
+    table = "composite",
+    insertable,
+    patchable,
+    deletable,
+    error_type = "TestError",
+    before_patch = "Composite::before_patch",
+    after_patch = "Composite::after_patch",
+    before_update = "Composite::before_update",
+    after_update = "Composite::after_update",
+    before_insert = "Composite::before_insert",
+    after_insert = "Composite::after_insert",
+    before_delete = "Composite::before_delete",
+    after_delete = "Composite::after_delete"
+)]
+struct Composite {
+    #[ormx(key)]
+    name: String,
+    #[ormx(key)]
+    other: String,
+}
+
+impl Composite {
+    async fn before_patch(
+        _model: &Composite,
+        _patch: &PatchComposite,
+        _db_pool: &mut PgConnection,
+    ) -> Result<(), TestError> {
+        println!("before patch");
+        Ok(())
+    }
+
+    async fn after_patch(
+        _model: &Composite,
+        _previous: Composite,
+        _db_pool: &mut PgConnection,
+    ) -> Result<(), TestError> {
+        println!("after patch");
+        dbg!(_model);
+        dbg!(_previous);
+        Ok(())
+    }
+
+    async fn before_update(
+        _model: &Composite,
+        _db_pool: &mut PgConnection,
+    ) -> Result<(), TestError> {
+        println!("before update");
+        Ok(())
+    }
+
+    async fn after_update(
+        _model: &Composite,
+        _previous: Composite,
+        _db_pool: &mut PgConnection,
+    ) -> Result<(), TestError> {
+        println!("after update");
+        dbg!(_model);
+        dbg!(_previous);
+        Ok(())
+    }
+
+    async fn before_delete(
+        _model: &Composite,
+        _db_pool: &mut PgConnection,
+    ) -> Result<(), TestError> {
+        println!("before delete");
+        Ok(())
+    }
+
+    async fn after_delete(_model: Composite, _db_pool: &mut PgConnection) -> Result<(), TestError> {
+        println!("after delete");
+        Ok(())
+    }
+
+    async fn before_insert(
+        _model: &InsertComposite,
+        _db_pool: &mut PgConnection,
+    ) -> Result<(), TestError> {
+        println!("before insert");
+        Ok(())
+    }
+
+    async fn after_insert(
+        _model: &Composite,
+        _db_pool: &mut PgConnection,
+    ) -> Result<(), TestError> {
+        println!("after insert");
+        Ok(())
+    }
 }

@@ -1,11 +1,20 @@
 use crate::{attrs::ConvertType, entity::EntityField, Entity};
 use itertools::Itertools;
-use proc_macro2::TokenStream;
+use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 
 pub fn update(entity: &Entity) -> TokenStream {
+    let primary_keys: Vec<&EntityField> = entity.fields.iter().filter(|x| x.is_key).collect();
+    let mut where_part = String::new();
+    for (index, key) in primary_keys.iter().enumerate() {
+        where_part.push_str(format!(" {} = ${}", key.column_name, index + 1).as_str());
+        if index + 1 != primary_keys.len() {
+            where_part.push_str(" AND")
+        }
+    }
+
     let sql = format!(
-        "UPDATE {} SET {} WHERE {} = $1",
+        "UPDATE {} SET {} WHERE {where_part}",
         entity.table_name,
         entity
             .updatable_fields()
@@ -13,13 +22,11 @@ pub fn update(entity: &Entity) -> TokenStream {
             .map(|(index, field)| format!(
                 "{} = ${}",
                 field.column_name.replace("r#", ""),
-                index + 2
+                index + primary_keys.len() + 1
             ))
             .join(", "),
-        entity.id.column_name
     );
 
-    let id_ident = &entity.id.ident;
     let vis = &entity.vis;
 
     let updatable_fields = entity.updatable_fields().map(|field| {
@@ -43,10 +50,13 @@ pub fn update(entity: &Entity) -> TokenStream {
         .map(EntityField::fmt_for_select)
         .join(", ");
 
-    let before_value_sql = format!(
-        "SELECT {} FROM {} WHERE {} = $1",
-        columns, entity.table_name, entity.id.column_name
-    );
+    let mut before_value_sql = format!("SELECT {} FROM {} WHERE", columns, entity.table_name);
+    for (index, key) in primary_keys.iter().enumerate() {
+        before_value_sql.push_str(format!(" {} = ${}", key.column_name, index + 1).as_str());
+        if index + 1 != primary_keys.len() {
+            before_value_sql.push_str(" AND")
+        }
+    }
 
     let before_update = if let Some(before_fn) = &entity.before_update {
         quote!(
@@ -56,13 +66,15 @@ pub fn update(entity: &Entity) -> TokenStream {
         quote!()
     };
 
-    let sqlx_call = quote!(sqlx::query!(#sql, self.#id_ident, #(#updatable_fields,)*));
+    let ident_keys: Vec<&Ident> = primary_keys.iter().map(|x| &x.ident).collect();
+
+    let sqlx_call = quote!(sqlx::query!(#sql, #(self.#ident_keys),*, #(#updatable_fields,)*));
 
     let has_trigger = entity.after_update.is_some() || entity.before_update.is_some();
 
     let after_update = if let Some(after_fn) = &entity.after_update {
         quote!(
-            let previous = sqlx::query_as!(Self, #before_value_sql, self.id)
+            let previous = sqlx::query_as!(Self, #before_value_sql, #(self.#ident_keys),*)
                 .fetch_one(&mut *conn)
                 .await?;
 

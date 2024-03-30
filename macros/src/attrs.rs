@@ -5,7 +5,6 @@ use syn::{Attribute, Error, ExprPath, LitBool, LitStr, Result, Token};
 
 pub enum EntityAttr {
     Table(String),
-    Id(Ident),
     Update(Option<Ident>),
     Insertable(Option<Ident>),
     Patchable(Option<Ident>),
@@ -29,7 +28,12 @@ impl Parse for EntityAttr {
         let ident = input.parse::<Ident>()?;
         let attr = match &*ident.to_string() {
             "table" => Table(assign_string(ident.span(), &input)?),
-            "id" => Id(assign_ident(ident.span(), &input)?),
+            // "primary_key" => PrimaryKey(Some(assign_ident(ident.span(), &input)?)),
+            // "composite_key" => {
+            //     dbg!(&input, &ident);
+
+            //     todo!()
+            // }
             "update" => Update(opt_assign_ident(&input)?),
             "insertable" => Insertable(opt_assign_ident(&input)?),
             "patchable" => Patchable(opt_assign_ident(&input)?),
@@ -65,6 +69,7 @@ pub enum FieldAttr {
     Updatable(bool),
     Patchable(bool),
     Convert(ConvertType),
+    Key,
     Default,
     CustomType,
 }
@@ -88,6 +93,7 @@ impl Parse for FieldAttr {
             "get_many" => GetMany(opt_assign_ident(&input)?),
             "delete" => Delete(opt_assign_ident(&input)?),
             "default" => Default,
+            "key" => Key,
             "custom_type" => CustomType,
             "patchable" => Patchable(opt_assign_bool(&input)?.unwrap_or(true)),
             "updatable" => Updatable(opt_assign_bool(&input)?.unwrap_or(true)),

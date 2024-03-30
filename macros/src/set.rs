@@ -12,14 +12,21 @@ pub fn setters(entity: &Entity) -> TokenStream2 {
 }
 
 fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
-    let query = format!(
-        "UPDATE {} SET {} = $1 WHERE {} = $2",
-        entity.table_name, field.column_name, entity.id.column_name
+    let mut query = format!(
+        "UPDATE {} SET {} = $1 WHERE",
+        entity.table_name, field.column_name
     );
+
+    let primary_keys: Vec<&EntityField> = entity.fields.iter().filter(|x| x.is_key).collect();
+    for (index, key) in primary_keys.iter().enumerate() {
+        query.push_str(format!(" {} = ${}", key.column_name, index + 2).as_str());
+        if index + 1 != primary_keys.len() {
+            query.push_str(" AND")
+        }
+    }
 
     let field_ty = &field.ty;
     let field_ident = &field.ident;
-    let pkey = &entity.id.ident;
     let vis = &entity.vis;
 
     let value_converter = match &field.convert {
@@ -34,13 +41,15 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
         quote!(Result<(), sqlx::Error>)
     };
 
+    let ident_keys = primary_keys.iter().map(|x| &x.ident);
+
     quote! {
         #vis async fn #fn_name(
             &mut self,
             conn: &mut sqlx::PgConnection,
             value: #field_ty
         ) -> #ret_type {
-            sqlx::query!(#query, #value_converter, &self.#pkey)
+            sqlx::query!(#query, #value_converter, #(&self.#ident_keys),*)
                 .execute(conn)
                 .await?;
             self.#field_ident = value;
