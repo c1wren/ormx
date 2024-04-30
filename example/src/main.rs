@@ -1,4 +1,5 @@
 use anyhow::Result;
+use serde::Serialize;
 use sqlx::{postgres::PgPoolOptions, PgConnection};
 
 mod error;
@@ -16,6 +17,17 @@ async fn main() -> Result<()> {
         .await?;
 
     // test insertion
+    let club_ctx: Club = InsertClub {
+        name: "test 4".into(),
+        test_rename: "test 4".into(),
+        test2: TestEnum::Test2,
+        test4: Some(vec![1, 2, 3, 4]),
+        r#type: 3,
+    }
+    .insert_with_context(&mut *db_pool.acquire().await?, Some(&6))
+    .await?;
+    dbg!(&club_ctx);
+
     // returns a Club
     let mut club: Club = InsertClub {
         name: "test 4".into(),
@@ -78,7 +90,7 @@ pub enum TestEnum {
 
 // by default, when you derive Entity, you only get the functionality of updating a model
 // derive insertable, patchable, and deletable to have the respective functionality
-#[derive(ormx::Entity, sqlx::FromRow, Debug)]
+#[derive(ormx::Entity, sqlx::FromRow, Debug, Clone)]
 #[ormx(
     table = "clubs",
     update = "my_update",
@@ -117,18 +129,20 @@ struct Club {
 }
 
 impl Club {
-    async fn before_patch(
+    async fn before_patch<T: Serialize>(
         _model: &Club,
         _patch: &PatchClub,
+        _context: Option<&T>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("before patch");
         Ok(())
     }
 
-    async fn after_patch(
+    async fn after_patch<T: Serialize>(
         _model: &Club,
         _previous: Club,
+        _context: Option<&T>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("after patch");
@@ -137,14 +151,19 @@ impl Club {
         Ok(())
     }
 
-    async fn before_update(_model: &Club, _db_pool: &mut PgConnection) -> Result<(), TestError> {
+    async fn before_update<T: Serialize>(
+        _model: &Club,
+        _context: Option<&T>,
+        _db_pool: &mut PgConnection,
+    ) -> Result<(), TestError> {
         println!("before update");
         Ok(())
     }
 
-    async fn after_update(
+    async fn after_update<T: Serialize>(
         _model: &Club,
         _previous: Club,
+        _context: Option<&T>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("after update");
@@ -153,25 +172,38 @@ impl Club {
         Ok(())
     }
 
-    async fn before_delete(_model: &Club, _db_pool: &mut PgConnection) -> Result<(), TestError> {
+    async fn before_delete<T: Serialize>(
+        _model: &Club,
+        _context: Option<&T>,
+        _db_pool: &mut PgConnection,
+    ) -> Result<(), TestError> {
         println!("before delete");
         Ok(())
     }
 
-    async fn after_delete(_model: Club, _db_pool: &mut PgConnection) -> Result<(), TestError> {
+    async fn after_delete<T: Serialize>(
+        _model: Club,
+        _context: Option<&T>,
+        _db_pool: &mut PgConnection,
+    ) -> Result<(), TestError> {
         println!("after delete");
         Ok(())
     }
 
-    async fn before_insert(
+    async fn before_insert<T: Serialize>(
         _model: &InsertClub,
+        _context: Option<&T>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("before insert");
         Ok(())
     }
 
-    async fn after_insert(_model: &Club, _db_pool: &mut PgConnection) -> Result<(), TestError> {
+    async fn after_insert<T: Serialize>(
+        _model: &Club,
+        _context: Option<&T>,
+        _db_pool: &mut PgConnection,
+    ) -> Result<(), TestError> {
         println!("after insert");
         Ok(())
     }
@@ -208,18 +240,20 @@ struct Composite {
 }
 
 impl Composite {
-    async fn before_patch(
+    async fn before_patch<T: Serialize>(
         _model: &Composite,
         _patch: &PatchComposite,
+        _context: Option<&T>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("before patch");
         Ok(())
     }
 
-    async fn after_patch(
+    async fn after_patch<T: Serialize>(
         _model: &Composite,
         _previous: Composite,
+        _context: Option<&T>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("after patch");
@@ -228,17 +262,19 @@ impl Composite {
         Ok(())
     }
 
-    async fn before_update(
+    async fn before_update<T: Serialize>(
         _model: &Composite,
+        _context: Option<&T>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("before update");
         Ok(())
     }
 
-    async fn after_update(
+    async fn after_update<T: Serialize>(
         _model: &Composite,
         _previous: Composite,
+        _context: Option<&T>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("after update");
@@ -247,29 +283,36 @@ impl Composite {
         Ok(())
     }
 
-    async fn before_delete(
+    async fn before_delete<T: Serialize>(
         _model: &Composite,
+        _context: Option<&T>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("before delete");
         Ok(())
     }
 
-    async fn after_delete(_model: Composite, _db_pool: &mut PgConnection) -> Result<(), TestError> {
+    async fn after_delete<T: Serialize>(
+        _model: Composite,
+        _context: Option<&T>,
+        _db_pool: &mut PgConnection,
+    ) -> Result<(), TestError> {
         println!("after delete");
         Ok(())
     }
 
-    async fn before_insert(
+    async fn before_insert<T: Serialize>(
         _model: &InsertComposite,
+        _context: Option<&T>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("before insert");
         Ok(())
     }
 
-    async fn after_insert(
+    async fn after_insert<T: Serialize>(
         _model: &Composite,
+        _context: Option<&T>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("after insert");

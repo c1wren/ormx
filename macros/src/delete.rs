@@ -37,7 +37,7 @@ fn delete_self(entity: &Entity) -> TokenStream {
 
     let before_delete = if let Some(before_fn) = &entity.before_delete {
         quote!(
-            #before_fn(&self, &mut *conn).await?;
+            #before_fn(&self, context, &mut *conn).await?;
         )
     } else {
         quote!()
@@ -49,7 +49,7 @@ fn delete_self(entity: &Entity) -> TokenStream {
         quote!(
             sqlx::query!(#sql, #(self.#ident_keys),*).execute(&mut *conn).await?;
 
-            #after_fn(self, conn).await?;
+            #after_fn(self, context, conn).await?;
         )
     } else {
         quote!(
@@ -83,6 +83,20 @@ fn delete_self(entity: &Entity) -> TokenStream {
         #vis async fn delete(
             self,
             conn: &mut sqlx::PgConnection,
+        ) -> #ret_type {
+            let context: Option<&()> = None;
+
+            #before_delete
+
+            #after_delete
+
+            Ok(())
+        }
+
+        #vis async fn delete_with_context<T: Serialize>(
+            self,
+            conn: &mut sqlx::PgConnection,
+            context: Option<&T>,
         ) -> #ret_type {
             #before_delete
 

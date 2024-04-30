@@ -115,7 +115,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
 
     let before_patch = if let Some(before_fn) = &entity.before_patch {
         quote!(
-            #before_fn(self, &patch, &mut *conn).await?;
+            #before_fn(self, &patch, context, &mut *conn).await?;
         )
     } else {
         quote!()
@@ -155,7 +155,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
                 self.#patchable_fields = new_value;
             })*
 
-            #after_fn(self, previous, conn).await?;
+            #after_fn(self, previous, context, conn).await?;
         )
     } else {
         quote!(
@@ -228,6 +228,21 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
             #vis async fn patch(
                 &mut self,
                 conn: &mut sqlx::PgConnection,
+                patch: #patch_struct_ident,
+            ) -> #ret_type {
+                let context: Option<&()> = None;
+
+                #before_patch
+
+                #after_patch
+
+                Ok(())
+            }
+
+            #vis async fn patch_with_context<T: Serialize>(
+                &mut self,
+                conn: &mut sqlx::PgConnection,
+                context: Option<&T>,
                 patch: #patch_struct_ident,
             ) -> #ret_type {
                 #before_patch

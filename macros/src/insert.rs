@@ -54,7 +54,7 @@ fn insert_fn(entity: &Entity) -> TokenStream {
 
     let before_insert = if let Some(before_fn) = &entity.before_insert {
         quote!(
-            #before_fn(&self, &mut *conn).await?;
+            #before_fn(&self, context, &mut *conn).await?;
         )
     } else {
         quote!()
@@ -66,7 +66,7 @@ fn insert_fn(entity: &Entity) -> TokenStream {
                 .fetch_one(&mut *conn)
                 .await?;
 
-            #after_fn(&rec, conn).await?;
+            #after_fn(&rec, context, conn).await?;
         )
     } else {
         quote!(
@@ -108,6 +108,20 @@ fn insert_fn(entity: &Entity) -> TokenStream {
         #vis async fn insert(
             self,
             conn: &mut sqlx::PgConnection,
+        ) -> #ret_type {
+            let context: Option<&()> = None;
+
+            #before_insert
+
+            #after_insert
+
+            Ok(rec)
+        }
+
+        #vis async fn insert_with_context<T: Serialize>(
+            self,
+            conn: &mut sqlx::PgConnection,
+            context: Option<&T>,
         ) -> #ret_type {
             #before_insert
 

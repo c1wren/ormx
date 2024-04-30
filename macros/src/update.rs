@@ -1,6 +1,6 @@
 use crate::{attrs::ConvertType, entity::EntityField, Entity};
 use itertools::Itertools;
-use proc_macro2::{Ident, TokenStream};
+use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
 
 pub fn update(entity: &Entity) -> TokenStream {
@@ -60,7 +60,7 @@ pub fn update(entity: &Entity) -> TokenStream {
 
     let before_update = if let Some(before_fn) = &entity.before_update {
         quote!(
-            #before_fn(self, &mut *conn).await?;
+            #before_fn(self, context, &mut *conn).await?;
         )
     } else {
         quote!()
@@ -80,7 +80,7 @@ pub fn update(entity: &Entity) -> TokenStream {
 
             #sqlx_call.execute(&mut *conn).await?;
 
-            #after_fn(self, previous, conn).await?;
+            #after_fn(self, previous, context, conn).await?;
         )
     } else {
         quote!(
@@ -115,14 +115,32 @@ pub fn update(entity: &Entity) -> TokenStream {
     };
 
     let fn_name = &entity.update;
+    let fn_name_with_context = Ident::new(&format!("{}_with_context", fn_name), Span::call_site());
 
     quote! {
-            /// Updates the row in the database specified by the primary key.
-            ///
-            /// This will update every field except the primary key field. `Patch` should be used if only updating some of the fields.
-            #vis async fn #fn_name(
+        /// Updates the row in the database specified by the primary key.
+        ///
+        /// This will update every field except the primary key field. `Patch` should be used if only updating some of the fields.
+        #vis async fn #fn_name(
             &self,
             conn: &mut sqlx::PgConnection
+        ) -> #ret_type {
+            let context: Option<&()> = None;
+
+            #before_update
+
+            #after_update
+
+            Ok(())
+        }
+
+        /// Updates the row in the database specified by the primary key.
+        ///
+        /// This will update every field except the primary key field. `Patch` should be used if only updating some of the fields.
+        #vis async fn #fn_name_with_context<T: Serialize>(
+            &self,
+            conn: &mut sqlx::PgConnection,
+            context: Option<&T>,
         ) -> #ret_type {
             #before_update
 
@@ -130,6 +148,7 @@ pub fn update(entity: &Entity) -> TokenStream {
 
             Ok(())
         }
+
 
         #no_trigger_variant
     }
