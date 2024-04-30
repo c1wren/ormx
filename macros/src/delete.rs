@@ -96,13 +96,19 @@ fn delete_self(entity: &Entity) -> TokenStream {
         quote! {}
     };
 
+    let ty = if entity.context_type.is_none() {
+        quote! { () }
+    } else {
+        quote! { _ }
+    };
+
     quote! {
         /// Deletes the entity with the specified primary key from the database.
         #vis async fn delete(
             self,
             conn: &mut sqlx::PgConnection,
         ) -> #ret_type {
-            let context = None::<_>;
+            let context = None::<#ty>;
 
             #before_delete
 

@@ -216,6 +216,12 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         quote! {}
     };
 
+    let ty = if entity.context_type.is_none() {
+        quote! { () }
+    } else {
+        quote! { _ }
+    };
+
     quote! {
         impl #patch_struct_ident {
             #vis async fn patch(
@@ -248,7 +254,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
                 conn: &mut sqlx::PgConnection,
                 patch: #patch_struct_ident,
             ) -> #ret_type {
-                let context = None::<_>;
+                let context = None::<#ty>;
 
                 #before_patch
 

@@ -140,6 +140,12 @@ pub fn update(entity: &Entity) -> TokenStream {
         quote! {}
     };
 
+    let ty = if entity.context_type.is_none() {
+        quote! { () }
+    } else {
+        quote! { _ }
+    };
+
     quote! {
         /// Updates the row in the database specified by the keys
         ///
@@ -148,7 +154,7 @@ pub fn update(entity: &Entity) -> TokenStream {
             &self,
             conn: &mut sqlx::PgConnection
         ) -> #ret_type {
-            let context = None::<_>;
+            let context = None::<#ty>;
 
             #before_update
 

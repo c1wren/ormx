@@ -122,13 +122,19 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
         quote! {}
     };
 
+    let ty = if entity.context_type.is_none() {
+        quote! { () }
+    } else {
+        quote! { _ }
+    };
+
     quote! {
         #vis async fn #fn_name(
             &mut self,
             conn: &mut sqlx::PgConnection,
             value: #field_ty
         ) -> #ret_type {
-            let context = None::<_>;
+            let context = None::<#ty>;
 
             #before_update
 

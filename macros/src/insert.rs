@@ -121,13 +121,19 @@ fn insert_fn(entity: &Entity) -> TokenStream {
         quote! {}
     };
 
+    let ty = if entity.context_type.is_none() {
+        quote! { () }
+    } else {
+        quote! { _ }
+    };
+
     quote! {
         /// Insert a row into the database.
         #vis async fn insert(
             self,
             conn: &mut sqlx::PgConnection,
         ) -> #ret_type {
-            let context = None::<_>;
+            let context = None::<#ty>;
 
             #before_insert
 
