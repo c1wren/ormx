@@ -116,7 +116,7 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
             Ok(())
         }
 
-        #vis async fn #fn_name_with_context<T: Serialize>(
+        #vis async fn #fn_name_with_context<T>(
             &mut self,
             conn: &mut sqlx::PgConnection,
             value: #field_ty,

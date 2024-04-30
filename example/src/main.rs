@@ -129,7 +129,7 @@ struct Club {
 }
 
 impl Club {
-    async fn before_patch<T: Serialize>(
+    async fn before_patch<T>(
         _model: &Club,
         _patch: &PatchClub,
         _context: Option<&T>,
@@ -139,7 +139,7 @@ impl Club {
         Ok(())
     }
 
-    async fn after_patch<T: Serialize>(
+    async fn after_patch<T>(
         _model: &Club,
         _previous: Club,
         _context: Option<&T>,
@@ -151,7 +151,7 @@ impl Club {
         Ok(())
     }
 
-    async fn before_update<T: Serialize>(
+    async fn before_update<T>(
         _model: &Club,
         _context: Option<&T>,
         _db_pool: &mut PgConnection,
@@ -160,7 +160,7 @@ impl Club {
         Ok(())
     }
 
-    async fn after_update<T: Serialize>(
+    async fn after_update<T>(
         _model: &Club,
         _previous: Club,
         _context: Option<&T>,
@@ -172,7 +172,7 @@ impl Club {
         Ok(())
     }
 
-    async fn before_delete<T: Serialize>(
+    async fn before_delete<T>(
         _model: &Club,
         _context: Option<&T>,
         _db_pool: &mut PgConnection,
@@ -181,7 +181,7 @@ impl Club {
         Ok(())
     }
 
-    async fn after_delete<T: Serialize>(
+    async fn after_delete<T>(
         _model: Club,
         _context: Option<&T>,
         _db_pool: &mut PgConnection,
@@ -190,7 +190,7 @@ impl Club {
         Ok(())
     }
 
-    async fn before_insert<T: Serialize>(
+    async fn before_insert<T>(
         _model: &InsertClub,
         _context: Option<&T>,
         _db_pool: &mut PgConnection,
@@ -199,7 +199,7 @@ impl Club {
         Ok(())
     }
 
-    async fn after_insert<T: Serialize>(
+    async fn after_insert<T>(
         _model: &Club,
         _context: Option<&T>,
         _db_pool: &mut PgConnection,
@@ -240,7 +240,7 @@ struct Composite {
 }
 
 impl Composite {
-    async fn before_patch<T: Serialize>(
+    async fn before_patch<T>(
         _model: &Composite,
         _patch: &PatchComposite,
         _context: Option<&T>,
@@ -250,7 +250,7 @@ impl Composite {
         Ok(())
     }
 
-    async fn after_patch<T: Serialize>(
+    async fn after_patch<T>(
         _model: &Composite,
         _previous: Composite,
         _context: Option<&T>,
@@ -262,7 +262,7 @@ impl Composite {
         Ok(())
     }
 
-    async fn before_update<T: Serialize>(
+    async fn before_update<T>(
         _model: &Composite,
         _context: Option<&T>,
         _db_pool: &mut PgConnection,
@@ -271,7 +271,7 @@ impl Composite {
         Ok(())
     }
 
-    async fn after_update<T: Serialize>(
+    async fn after_update<T>(
         _model: &Composite,
         _previous: Composite,
         _context: Option<&T>,
@@ -283,7 +283,7 @@ impl Composite {
         Ok(())
     }
 
-    async fn before_delete<T: Serialize>(
+    async fn before_delete<T>(
         _model: &Composite,
         _context: Option<&T>,
         _db_pool: &mut PgConnection,
@@ -292,7 +292,7 @@ impl Composite {
         Ok(())
     }
 
-    async fn after_delete<T: Serialize>(
+    async fn after_delete<T>(
         _model: Composite,
         _context: Option<&T>,
         _db_pool: &mut PgConnection,
@@ -301,7 +301,7 @@ impl Composite {
         Ok(())
     }
 
-    async fn before_insert<T: Serialize>(
+    async fn before_insert<T>(
         _model: &InsertComposite,
         _context: Option<&T>,
         _db_pool: &mut PgConnection,
@@ -310,7 +310,7 @@ impl Composite {
         Ok(())
     }
 
-    async fn after_insert<T: Serialize>(
+    async fn after_insert<T>(
         _model: &Composite,
         _context: Option<&T>,
         _db_pool: &mut PgConnection,

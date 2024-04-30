@@ -137,7 +137,7 @@ pub fn update(entity: &Entity) -> TokenStream {
         /// Updates the row in the database specified by the primary key.
         ///
         /// This will update every field except the primary key field. `Patch` should be used if only updating some of the fields.
-        #vis async fn #fn_name_with_context<T: Serialize>(
+        #vis async fn #fn_name_with_context<T>(
             &self,
             conn: &mut sqlx::PgConnection,
             context: Option<&T>,

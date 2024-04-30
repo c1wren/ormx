@@ -118,7 +118,7 @@ fn insert_fn(entity: &Entity) -> TokenStream {
             Ok(rec)
         }
 
-        #vis async fn insert_with_context<T: Serialize>(
+        #vis async fn insert_with_context<T>(
             self,
             conn: &mut sqlx::PgConnection,
             context: Option<&T>,

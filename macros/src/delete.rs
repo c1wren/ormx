@@ -93,7 +93,7 @@ fn delete_self(entity: &Entity) -> TokenStream {
             Ok(())
         }
 
-        #vis async fn delete_with_context<T: Serialize>(
+        #vis async fn delete_with_context<T>(
             self,
             conn: &mut sqlx::PgConnection,
             context: Option<&T>,

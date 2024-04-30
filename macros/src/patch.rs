@@ -239,7 +239,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
                 Ok(())
             }
 
-            #vis async fn patch_with_context<T: Serialize>(
+            #vis async fn patch_with_context<T>(
                 &mut self,
                 conn: &mut sqlx::PgConnection,
                 context: Option<&T>,
