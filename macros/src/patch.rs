@@ -202,8 +202,8 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
             #vis async fn patch_with_context(
                 &mut self,
                 conn: &mut sqlx::PgConnection,
-                context: Option<&#context_type>,
                 patch: #patch_struct_ident,
+                context: Option<&#context_type>,
             ) -> #ret_type {
                 #before_patch
 
