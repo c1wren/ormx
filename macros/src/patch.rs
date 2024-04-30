@@ -178,24 +178,42 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
             /// Updates the row as specified by the entity's primary key with only the fields that are included in the patch.
             ///
             /// Does not call the before and after triggers.
-            impl #entity_ident {
-                #vis async fn no_trigger_patch(
-                    &mut self,
-                    conn: &mut sqlx::PgConnection,
-                    patch: #patch_struct_ident,
-                ) -> #ret_type {
-                    #patch_struct_ident::patch(&patch, conn, #( #items ),*).await?;
+            #vis async fn no_trigger_patch(
+                &mut self,
+                conn: &mut sqlx::PgConnection,
+                patch: #patch_struct_ident,
+            ) -> #ret_type {
+                #patch_struct_ident::patch(&patch, conn, #( #items ),*).await?;
 
-                    #(if let Some(new_value) = patch.#patchable_fields {
-                        self.#patchable_fields = new_value;
-                    })*
+                #(if let Some(new_value) = patch.#patchable_fields {
+                    self.#patchable_fields = new_value;
+                })*
 
-                    Ok(())
-                }
+                Ok(())
             }
         }
     } else {
         quote!()
+    };
+
+    let context_variant = if let Some(context_type) = &entity.context_type {
+        quote! {
+            /// Updates the row as specified by the entity's keys with only the fields that are included in the patch.
+            #vis async fn patch_with_context(
+                &mut self,
+                conn: &mut sqlx::PgConnection,
+                context: Option<&#context_type>,
+                patch: #patch_struct_ident,
+            ) -> #ret_type {
+                #before_patch
+
+                #after_patch
+
+                Ok(())
+            }
+        }
+    } else {
+        quote! {}
     };
 
     quote! {
@@ -223,14 +241,14 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
             }
         }
 
-        /// Updates the row as specified by the entity's primary key with only the fields that are included in the patch.
         impl #entity_ident {
+            /// Updates the row as specified by the entity's keys with only the fields that are included in the patch.
             #vis async fn patch(
                 &mut self,
                 conn: &mut sqlx::PgConnection,
                 patch: #patch_struct_ident,
             ) -> #ret_type {
-                let context: Option<&()> = None;
+                let context = None::<_>;
 
                 #before_patch
 
@@ -239,20 +257,9 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
                 Ok(())
             }
 
-            #vis async fn patch_with_context<T>(
-                &mut self,
-                conn: &mut sqlx::PgConnection,
-                context: Option<&T>,
-                patch: #patch_struct_ident,
-            ) -> #ret_type {
-                #before_patch
+            #context_variant
 
-                #after_patch
-
-                Ok(())
-            }
+            #no_trigger_variant
         }
-
-        #no_trigger_variant
     }
 }

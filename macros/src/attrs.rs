@@ -19,6 +19,7 @@ pub enum EntityAttr {
     BeforeDelete(ExprPath),
     AfterDelete(ExprPath),
     ErrorType(Ident),
+    ContextType(Ident),
 }
 
 impl Parse for EntityAttr {
@@ -28,12 +29,6 @@ impl Parse for EntityAttr {
         let ident = input.parse::<Ident>()?;
         let attr = match &*ident.to_string() {
             "table" => Table(assign_string(ident.span(), &input)?),
-            // "primary_key" => PrimaryKey(Some(assign_ident(ident.span(), &input)?)),
-            // "composite_key" => {
-            //     dbg!(&input, &ident);
-
-            //     todo!()
-            // }
             "update" => Update(opt_assign_ident(&input)?),
             "insertable" => Insertable(opt_assign_ident(&input)?),
             "patchable" => Patchable(opt_assign_ident(&input)?),
@@ -48,6 +43,7 @@ impl Parse for EntityAttr {
             "before_delete" => BeforeDelete(assign_expr_path(ident.span(), &input)?),
             "after_delete" => AfterDelete(assign_expr_path(ident.span(), &input)?),
             "error_type" => ErrorType(assign_ident(ident.span(), &input)?),
+            "context_type" => ContextType(assign_ident(ident.span(), &input)?),
             other => {
                 return Err(Error::new(
                     ident.span(),

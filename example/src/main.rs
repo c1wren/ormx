@@ -17,16 +17,16 @@ async fn main() -> Result<()> {
         .await?;
 
     // test insertion
-    let club_ctx: Club = InsertClub {
-        name: "test 4".into(),
-        test_rename: "test 4".into(),
-        test2: TestEnum::Test2,
-        test4: Some(vec![1, 2, 3, 4]),
-        r#type: 3,
-    }
-    .insert_with_context(&mut *db_pool.acquire().await?, Some(&6))
-    .await?;
-    dbg!(&club_ctx);
+    // let club_ctx: Club = InsertClub {
+    //     name: "test 4".into(),
+    //     test_rename: "test 4".into(),
+    //     test2: TestEnum::Test2,
+    //     test4: Some(vec![1, 2, 3, 4]),
+    //     r#type: 3,
+    // }
+    // .insert_with_context(&mut *db_pool.acquire().await?, Some(&6))
+    // .await?;
+    // dbg!(&club_ctx);
 
     // returns a Club
     let mut club: Club = InsertClub {
@@ -98,6 +98,7 @@ pub enum TestEnum {
     patchable,
     deletable,
     get_all = "find_all_clubs",
+    context_type = "i32",
     error_type = "TestError",
     before_patch = "Club::before_patch",
     after_patch = "Club::after_patch",
@@ -129,20 +130,20 @@ struct Club {
 }
 
 impl Club {
-    async fn before_patch<T>(
+    async fn before_patch(
         _model: &Club,
         _patch: &PatchClub,
-        _context: Option<&T>,
+        _context: Option<&i32>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("before patch");
         Ok(())
     }
 
-    async fn after_patch<T>(
+    async fn after_patch(
         _model: &Club,
         _previous: Club,
-        _context: Option<&T>,
+        _context: Option<&i32>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("after patch");
@@ -151,19 +152,19 @@ impl Club {
         Ok(())
     }
 
-    async fn before_update<T>(
+    async fn before_update(
         _model: &Club,
-        _context: Option<&T>,
+        _context: Option<&i32>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("before update");
         Ok(())
     }
 
-    async fn after_update<T>(
+    async fn after_update(
         _model: &Club,
         _previous: Club,
-        _context: Option<&T>,
+        _context: Option<&i32>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("after update");
@@ -172,36 +173,36 @@ impl Club {
         Ok(())
     }
 
-    async fn before_delete<T>(
+    async fn before_delete(
         _model: &Club,
-        _context: Option<&T>,
+        _context: Option<&i32>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("before delete");
         Ok(())
     }
 
-    async fn after_delete<T>(
+    async fn after_delete(
         _model: Club,
-        _context: Option<&T>,
+        _context: Option<&i32>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("after delete");
         Ok(())
     }
 
-    async fn before_insert<T>(
+    async fn before_insert(
         _model: &InsertClub,
-        _context: Option<&T>,
+        _context: Option<&i32>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("before insert");
         Ok(())
     }
 
-    async fn after_insert<T>(
+    async fn after_insert(
         _model: &Club,
-        _context: Option<&T>,
+        _context: Option<&i32>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("after insert");
@@ -222,6 +223,7 @@ fn my_convert(t: &Option<Vec<i32>>) -> Option<&[i32]> {
     insertable,
     patchable,
     deletable,
+    context_type = "i32",
     error_type = "TestError",
     before_patch = "Composite::before_patch",
     after_patch = "Composite::after_patch",
@@ -240,20 +242,20 @@ struct Composite {
 }
 
 impl Composite {
-    async fn before_patch<T>(
+    async fn before_patch(
         _model: &Composite,
         _patch: &PatchComposite,
-        _context: Option<&T>,
+        _context: Option<&i32>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("before patch");
         Ok(())
     }
 
-    async fn after_patch<T>(
+    async fn after_patch(
         _model: &Composite,
         _previous: Composite,
-        _context: Option<&T>,
+        _context: Option<&i32>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("after patch");
@@ -262,19 +264,19 @@ impl Composite {
         Ok(())
     }
 
-    async fn before_update<T>(
+    async fn before_update(
         _model: &Composite,
-        _context: Option<&T>,
+        _context: Option<&i32>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("before update");
         Ok(())
     }
 
-    async fn after_update<T>(
+    async fn after_update(
         _model: &Composite,
         _previous: Composite,
-        _context: Option<&T>,
+        _context: Option<&i32>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("after update");
@@ -283,36 +285,36 @@ impl Composite {
         Ok(())
     }
 
-    async fn before_delete<T>(
+    async fn before_delete(
         _model: &Composite,
-        _context: Option<&T>,
+        _context: Option<&i32>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("before delete");
         Ok(())
     }
 
-    async fn after_delete<T>(
+    async fn after_delete(
         _model: Composite,
-        _context: Option<&T>,
+        _context: Option<&i32>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("after delete");
         Ok(())
     }
 
-    async fn before_insert<T>(
+    async fn before_insert(
         _model: &InsertComposite,
-        _context: Option<&T>,
+        _context: Option<&i32>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("before insert");
         Ok(())
     }
 
-    async fn after_insert<T>(
+    async fn after_insert(
         _model: &Composite,
-        _context: Option<&T>,
+        _context: Option<&i32>,
         _db_pool: &mut PgConnection,
     ) -> Result<(), TestError> {
         println!("after insert");

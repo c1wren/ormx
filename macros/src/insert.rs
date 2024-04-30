@@ -103,13 +103,31 @@ fn insert_fn(entity: &Entity) -> TokenStream {
         quote!()
     };
 
+    let context_variant = if let Some(context_type) = &entity.context_type {
+        quote! {
+            #vis async fn insert_with_context(
+                self,
+                conn: &mut sqlx::PgConnection,
+                context: Option<&#context_type>,
+            ) -> #ret_type {
+                #before_insert
+
+                #after_insert
+
+                Ok(rec)
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     quote! {
         /// Insert a row into the database.
         #vis async fn insert(
             self,
             conn: &mut sqlx::PgConnection,
         ) -> #ret_type {
-            let context: Option<&()> = None;
+            let context = None::<_>;
 
             #before_insert
 
@@ -118,17 +136,7 @@ fn insert_fn(entity: &Entity) -> TokenStream {
             Ok(rec)
         }
 
-        #vis async fn insert_with_context<T>(
-            self,
-            conn: &mut sqlx::PgConnection,
-            context: Option<&T>,
-        ) -> #ret_type {
-            #before_insert
-
-            #after_insert
-
-            Ok(rec)
-        }
+        #context_variant
 
         #no_trigger_variant
     }

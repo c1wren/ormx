@@ -115,17 +115,40 @@ pub fn update(entity: &Entity) -> TokenStream {
     };
 
     let fn_name = &entity.update;
-    let fn_name_with_context = Ident::new(&format!("{}_with_context", fn_name), Span::call_site());
+
+    let context_variant = if let Some(context_type) = &entity.context_type {
+        let fn_name_with_context =
+            Ident::new(&format!("{}_with_context", fn_name), Span::call_site());
+
+        quote! {
+            /// Updates the row in the database specified by the keys
+            ///
+            /// `Patch` should be used if only updating some of the fields.
+            #vis async fn #fn_name_with_context(
+                &self,
+                conn: &mut sqlx::PgConnection,
+                context: Option<&#context_type>
+            ) -> #ret_type {
+                #before_update
+
+                #after_update
+
+                Ok(())
+            }
+        }
+    } else {
+        quote! {}
+    };
 
     quote! {
-        /// Updates the row in the database specified by the primary key.
+        /// Updates the row in the database specified by the keys
         ///
-        /// This will update every field except the primary key field. `Patch` should be used if only updating some of the fields.
+        /// `Patch` should be used if only updating some of the fields.
         #vis async fn #fn_name(
             &self,
             conn: &mut sqlx::PgConnection
         ) -> #ret_type {
-            let context: Option<&()> = None;
+            let context = None::<_>;
 
             #before_update
 
@@ -134,21 +157,7 @@ pub fn update(entity: &Entity) -> TokenStream {
             Ok(())
         }
 
-        /// Updates the row in the database specified by the primary key.
-        ///
-        /// This will update every field except the primary key field. `Patch` should be used if only updating some of the fields.
-        #vis async fn #fn_name_with_context<T>(
-            &self,
-            conn: &mut sqlx::PgConnection,
-            context: Option<&T>,
-        ) -> #ret_type {
-            #before_update
-
-            #after_update
-
-            Ok(())
-        }
-
+        #context_variant
 
         #no_trigger_variant
     }

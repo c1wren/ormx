@@ -18,7 +18,6 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
         entity.table_name, field.column_name
     );
 
-    let fn_name_with_context = Ident::new(&format!("{}_with_context", fn_name), Span::call_site());
     let fn_name_no_trigger = Ident::new(&format!("no_trigger_{}", fn_name), Span::call_site());
 
     let primary_keys: Vec<&EntityField> = entity.fields.iter().filter(|x| x.is_key).collect();
@@ -101,13 +100,35 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
         quote!()
     };
 
+    let context_variant = if let Some(context_type) = &entity.context_type {
+        let fn_name_with_context =
+            Ident::new(&format!("{}_with_context", fn_name), Span::call_site());
+
+        quote! {
+            #vis async fn #fn_name_with_context(
+                &mut self,
+                conn: &mut sqlx::PgConnection,
+                value: #field_ty,
+                context: Option<&#context_type>
+            ) -> #ret_type {
+                #before_update
+
+                #after_update
+
+                Ok(())
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     quote! {
         #vis async fn #fn_name(
             &mut self,
             conn: &mut sqlx::PgConnection,
             value: #field_ty
         ) -> #ret_type {
-            let context: Option<&()> = None;
+            let context = None::<_>;
 
             #before_update
 
@@ -116,18 +137,7 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
             Ok(())
         }
 
-        #vis async fn #fn_name_with_context<T>(
-            &mut self,
-            conn: &mut sqlx::PgConnection,
-            value: #field_ty,
-            context: Option<&T>,
-        ) -> #ret_type {
-            #before_update
-
-            #after_update
-
-            Ok(())
-        }
+        #context_variant
 
         #no_trigger_variant
     }

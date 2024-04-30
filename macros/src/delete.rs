@@ -78,13 +78,31 @@ fn delete_self(entity: &Entity) -> TokenStream {
         quote!()
     };
 
+    let context_variant = if let Some(context_type) = &entity.context_type {
+        quote! {
+            #vis async fn delete_with_context(
+                self,
+                conn: &mut sqlx::PgConnection,
+                context: Option<&#context_type>,
+            ) -> #ret_type {
+                #before_delete
+
+                #after_delete
+
+                Ok(())
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     quote! {
         /// Deletes the entity with the specified primary key from the database.
         #vis async fn delete(
             self,
             conn: &mut sqlx::PgConnection,
         ) -> #ret_type {
-            let context: Option<&()> = None;
+            let context = None::<_>;
 
             #before_delete
 
@@ -93,17 +111,7 @@ fn delete_self(entity: &Entity) -> TokenStream {
             Ok(())
         }
 
-        #vis async fn delete_with_context<T>(
-            self,
-            conn: &mut sqlx::PgConnection,
-            context: Option<&T>,
-        ) -> #ret_type {
-            #before_delete
-
-            #after_delete
-
-            Ok(())
-        }
+        #context_variant
 
         #no_trigger_variant
     }

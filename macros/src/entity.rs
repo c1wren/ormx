@@ -62,6 +62,7 @@ pub struct Entity {
     pub after_delete: Option<ExprPath>,
 
     pub error_type: Option<Ident>,
+    pub context_type: Option<Ident>,
 }
 
 impl Entity {
@@ -174,6 +175,7 @@ impl TryFrom<DeriveInput> for Entity {
         let mut before_delete = None;
         let mut after_delete = None;
         let mut error_type = None;
+        let mut context_type = None;
 
         for attr in crate::attrs::parse_all::<EntityAttr>(&input.attrs)? {
             match attr {
@@ -216,6 +218,9 @@ impl TryFrom<DeriveInput> for Entity {
                 EntityAttr::ErrorType(error_ident) => {
                     error_type = Some(error_ident);
                 }
+                EntityAttr::ContextType(context_ident) => {
+                    context_type = Some(context_ident);
+                }
             }
         }
         let table_name = table_name.ok_or_else(|| missing_attr("table"))?;
@@ -255,6 +260,7 @@ impl TryFrom<DeriveInput> for Entity {
             before_delete,
             after_delete,
             error_type,
+            context_type,
         })
     }
 }
