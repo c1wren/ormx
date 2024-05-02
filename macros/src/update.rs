@@ -12,7 +12,7 @@ pub fn update(entity: &Entity) -> TokenStream {
     let primary_keys: Vec<&EntityField> = entity.fields.iter().filter(|x| x.is_key).collect();
     let mut where_part = String::new();
     for (index, key) in primary_keys.iter().enumerate() {
-        where_part.push_str(format!(" {} = ${}", key.column_name, index + 1).as_str());
+        where_part.push_str(format!("{} = ${}", key.column_name, index + 1).as_str());
         if index + 1 != primary_keys.len() {
             where_part.push_str(" AND")
         }
