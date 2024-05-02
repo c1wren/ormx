@@ -61,6 +61,9 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         .patchable_fields()
         .map(|field| &field.ident)
         .collect::<Vec<_>>();
+    if patchable_fields.is_empty() {
+        return quote! {};
+    }
     let entity_ident = &entity.ident;
     let table_name = &entity.table_name;
     let vis = &entity.vis;

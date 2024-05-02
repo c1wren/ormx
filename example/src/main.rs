@@ -237,7 +237,7 @@ fn my_convert(t: &Option<Vec<i32>>) -> Option<&[i32]> {
 struct Composite {
     #[ormx(key)]
     name: String,
-    #[ormx(key)]
+    #[ormx(key, patchable)]
     other: String,
 }
 

@@ -4,6 +4,11 @@ use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
 
 pub fn update(entity: &Entity) -> TokenStream {
+    let length = entity.updatable_fields().count();
+    if length == 0 {
+        return quote! {};
+    }
+
     let primary_keys: Vec<&EntityField> = entity.fields.iter().filter(|x| x.is_key).collect();
     let mut where_part = String::new();
     for (index, key) in primary_keys.iter().enumerate() {
