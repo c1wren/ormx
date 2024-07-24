@@ -14,7 +14,7 @@ pub fn update(entity: &Entity) -> TokenStream {
     for (index, key) in primary_keys.iter().enumerate() {
         where_part.push_str(format!("{} = ${}", key.column_name, index + 1).as_str());
         if index + 1 != primary_keys.len() {
-            where_part.push_str(" AND")
+            where_part.push_str(" AND ")
         }
     }
 
@@ -59,7 +59,7 @@ pub fn update(entity: &Entity) -> TokenStream {
     for (index, key) in primary_keys.iter().enumerate() {
         before_value_sql.push_str(format!(" {} = ${}", key.column_name, index + 1).as_str());
         if index + 1 != primary_keys.len() {
-            before_value_sql.push_str(" AND")
+            before_value_sql.push_str(" AND ")
         }
     }
 
@@ -128,7 +128,7 @@ pub fn update(entity: &Entity) -> TokenStream {
         quote! {
             /// Updates the row in the database specified by the keys
             ///
-            /// `Patch` should be used if only updating some of the fields.
+            /// Updates all fields of row, even ones that have not changed. Use Patch if this is not desired behavior.
             #vis async fn #fn_name_with_context(
                 &self,
                 conn: &mut sqlx::PgConnection,
@@ -154,7 +154,7 @@ pub fn update(entity: &Entity) -> TokenStream {
     quote! {
         /// Updates the row in the database specified by the keys
         ///
-        /// `Patch` should be used if only updating some of the fields.
+        /// Updates all fields of row, even ones that have not changed. Use Patch if this is not desired behavior.
         #vis async fn #fn_name(
             &self,
             conn: &mut sqlx::PgConnection

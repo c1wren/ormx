@@ -29,7 +29,7 @@ fn delete_self(entity: &Entity) -> TokenStream {
     for (index, key) in keys.iter().enumerate() {
         sql.push_str(format!(" {} = ${}", key.column_name, index + 1).as_str());
         if index + 1 != keys.len() {
-            sql.push_str(" AND")
+            sql.push_str(" AND ")
         }
     }
 

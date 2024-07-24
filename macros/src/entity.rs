@@ -40,7 +40,6 @@ impl EntityField {
 
 pub struct Entity {
     pub table_name: String,
-    pub primary_key: Vec<EntityField>,
     pub ident: Ident,
     pub fields: Vec<EntityField>,
     pub vis: Visibility,
@@ -247,19 +246,18 @@ impl TryFrom<DeriveInput> for Entity {
             .map(EntityField::try_from)
             .collect::<Result<Vec<_>>>()?;
 
-        let primary_key: Vec<EntityField> = fields
+        let table_keys: Vec<EntityField> = fields
             .iter()
             .filter(|field| field.is_key)
             .cloned()
             .collect();
 
-        if primary_key.is_empty() {
-            panic!("struct does not have a primary key")
+        if table_keys.is_empty() {
+            panic!("struct does not have a primary key or composite key")
         }
 
         Ok(Entity {
             table_name,
-            primary_key,
             fields,
             ident,
             vis: input.vis,
@@ -302,39 +300,3 @@ fn missing_attr(name: &str) -> Error {
         format!(r#"missing #[ormx({} = "..")) attribute"#, name),
     )
 }
-
-// let idents = match input.attrs.iter().find(|attr| attr.path.is_ident("my_macro")) {
-//     Some(attr) => match collect_idents(attr.parse_args()) {
-//         Ok(idents) => idents,
-//         Err(err) => return err.to_compile_error().into(),
-//     },
-//     None => {
-//         return Error::new_spanned(&input, "Missing `my_macro` attribute").to_compile_error().into();
-//     }
-// };
-
-// fn collect_idents(args: AttributeArgs) -> Result<Vec<Ident>> {
-//     let mut idents = Vec::new();
-
-//     for arg in args {
-//         match arg {
-//             syn::NestedMeta::Meta(meta) => {
-//                 match meta {
-//                     syn::Meta::Path(path) => {
-//                         if let Some(ident) = path.get_ident() {
-//                             idents.push(ident.clone());
-//                         }
-//                     }
-//                     _ => {
-//                         return Err(Error::new_spanned(meta, "Invalid argument"));
-//                     }
-//                 }
-//             }
-//             _ => {
-//                 return Err(Error::new_spanned(arg, "Invalid argument"));
-//             }
-//         }
-//     }
-
-//     Ok(idents)
-// }

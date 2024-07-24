@@ -1,5 +1,4 @@
 use anyhow::Result;
-use serde::Serialize;
 use sqlx::{postgres::PgPoolOptions, PgConnection};
 
 mod error;
@@ -239,6 +238,7 @@ struct Composite {
     name: String,
     #[ormx(key, patchable)]
     other: String,
+    non_key: String,
 }
 
 impl Composite {

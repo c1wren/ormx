@@ -109,8 +109,8 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         before_patch_sql.push_str(condition.as_str());
         patch_sql_statement.push_str(condition.as_str());
         if index + 1 != primary_keys.len() {
-            before_patch_sql.push_str(" AND");
-            patch_sql_statement.push_str(" AND");
+            before_patch_sql.push_str(" AND ");
+            patch_sql_statement.push_str(" AND ");
         }
     }
 

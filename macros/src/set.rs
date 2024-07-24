@@ -24,7 +24,7 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
     for (index, key) in primary_keys.iter().enumerate() {
         query.push_str(format!(" {} = ${}", key.column_name, index + 2).as_str());
         if index + 1 != primary_keys.len() {
-            query.push_str(" AND")
+            query.push_str(" AND ")
         }
     }
 
