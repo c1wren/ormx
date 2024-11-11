@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM composite WHERE name = $1 AND  other = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "69843d02cb385855e3f0424a1566d38af4dd6e6e1031a46e049f3b854cde4bee"
+}

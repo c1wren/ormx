@@ -21,10 +21,7 @@ pub fn getters(entity: &Entity) -> TokenStream2 {
                 .get_many
                 .as_ref()
                 .map(|name| many(entity, field, name));
-            get_one
-                .into_iter()
-                .chain(get_optional.into_iter())
-                .chain(get_many.into_iter())
+            get_one.into_iter().chain(get_optional).chain(get_many)
         })
         .collect::<TokenStream2>();
 
@@ -50,13 +47,25 @@ fn get_all(entity: &Entity) -> TokenStream2 {
         quote!(Result<Vec<Self>, sqlx::Error>)
     };
 
+    let call = if entity.error_type.is_some() {
+        quote! {
+            Ok(sqlx::query_as!(Self, #sql)
+                .fetch_all(conn)
+                .await?)
+        }
+    } else {
+        quote! {
+            sqlx::query_as!(Self, #sql)
+                .fetch_all(conn)
+                .await
+        }
+    };
+
     quote! {
         #vis async fn #fn_name(
             conn: &mut sqlx::PgConnection
         ) -> #ret_type {
-            Ok(sqlx::query_as!(Self, #sql)
-                .fetch_all(conn)
-                .await?)
+            #call
         }
     }
 }
@@ -78,14 +87,26 @@ fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
         quote!(Result<Self, sqlx::Error>)
     };
 
+    let call = if entity.error_type.is_some() {
+        quote! {
+            Ok(sqlx::query_as!(Self, #query, #by_converter)
+                .fetch_one(conn)
+                .await?)
+        }
+    } else {
+        quote! {
+            sqlx::query_as!(Self, #query, #by_converter)
+                .fetch_one(conn)
+                .await
+        }
+    };
+
     quote! {
         #vis async fn #fn_name(
             conn: &mut sqlx::PgConnection,
             val: &#val
         ) -> #ret_type {
-            Ok(sqlx::query_as!(Self, #query, #by_converter)
-                .fetch_one(conn)
-                .await?)
+            #call
         }
     }
 }
@@ -107,14 +128,26 @@ fn optional(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStrea
         quote!(Result<Option<Self>, sqlx::Error>)
     };
 
+    let call = if entity.error_type.is_some() {
+        quote! {
+            Ok(sqlx::query_as!(Self, #query, #by_converter)
+                .fetch_optional(conn)
+                .await?)
+        }
+    } else {
+        quote! {
+            sqlx::query_as!(Self, #query, #by_converter)
+                .fetch_optional(conn)
+                .await
+        }
+    };
+
     quote! {
         #vis async fn #fn_name(
             conn: &mut sqlx::PgConnection,
             val: &#val
         ) -> #ret_type {
-            Ok(sqlx::query_as!(Self, #query, #by_converter)
-                .fetch_optional(conn)
-                .await?)
+            #call
         }
     }
 }
@@ -136,14 +169,26 @@ fn many(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
         quote!(Result<Vec<Self>, sqlx::Error>)
     };
 
+    let call = if entity.error_type.is_some() {
+        quote! {
+            Ok(sqlx::query_as!(Self, #query, #by_converter)
+                .fetch_all(conn)
+                .await?)
+        }
+    } else {
+        quote! {
+            sqlx::query_as!(Self, #query, #by_converter)
+                .fetch_all(conn)
+                .await
+        }
+    };
+
     quote! {
         #vis async fn #fn_name(
             conn: &mut sqlx::PgConnection,
             val: &#val
         ) -> #ret_type {
-            Ok(sqlx::query_as!(Self, #query, #by_converter)
-                .fetch_all(conn)
-                .await?)
+            #call
         }
     }
 }

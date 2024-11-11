@@ -27,7 +27,12 @@ fn patch_struct(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
     let vis = &entity.vis;
     let fields = entity
         .patchable_fields()
-        .map(|EntityField { ident, ty, .. }| quote!(#vis #ident: Option<#ty>));
+        .map(|EntityField { ident, ty, .. }| {
+            quote! {
+                #[allow(dead_code)]
+                #vis #ident: Option<#ty>
+            }
+        });
 
     let setters = entity
         .patchable_fields()
@@ -88,7 +93,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
 
         quote!(
             if let Some(value) = self.#ident.as_ref() {
-                query = query.bind(#value_getter)
+                query = query.bind(#value_getter);
             }
         )
     });
@@ -219,10 +224,14 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         quote! {}
     };
 
-    let ty = if entity.context_type.is_none() {
-        quote! { () }
+    let context = if entity.context_type.is_none() {
+        if entity.before_patch.is_some() || entity.after_patch.is_some() {
+            quote! { let context = None::<()>; }
+        } else {
+            quote! {}
+        }
     } else {
-        quote! { _ }
+        quote! { let context = None::<_>; }
     };
 
     quote! {
@@ -257,7 +266,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
                 conn: &mut sqlx::PgConnection,
                 patch: #patch_struct_ident,
             ) -> #ret_type {
-                let context = None::<#ty>;
+                #context
 
                 #before_patch
 

@@ -1,0 +1,62 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO clubs (name, test1, test2, test4, type) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, test1 AS test_rename, test2 AS \"test2: _\", test3, test4, type",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "test_rename",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "test2: _",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "test3",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "test4",
+        "type_info": "Int4Array"
+      },
+      {
+        "ordinal": 6,
+        "name": "type",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Int4",
+        "Int4Array",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "a9c6b4576d406978c5c67a909dda3108177da2290ae4a60e5c216886033d27a0"
+}

@@ -121,10 +121,14 @@ fn insert_fn(entity: &Entity) -> TokenStream {
         quote! {}
     };
 
-    let ty = if entity.context_type.is_none() {
-        quote! { () }
+    let context = if entity.context_type.is_none() {
+        if entity.before_insert.is_some() || entity.after_insert.is_some() {
+            quote! { let context = None::<()>; }
+        } else {
+            quote! {}
+        }
     } else {
-        quote! { _ }
+        quote! { let context = None::<_>; }
     };
 
     quote! {
@@ -133,7 +137,7 @@ fn insert_fn(entity: &Entity) -> TokenStream {
             self,
             conn: &mut sqlx::PgConnection,
         ) -> #ret_type {
-            let context = None::<#ty>;
+            #context
 
             #before_insert
 
