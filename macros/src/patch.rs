@@ -149,11 +149,21 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         fn_items.push(stream);
     }
 
-    let ident_keys: Vec<&Ident> = primary_keys.iter().map(|x| &x.ident).collect();
+    let ident_keys: Vec<_> = primary_keys
+        .iter()
+        .map(|k| {
+            let ident = &k.ident;
+            if k.custom_type {
+                quote!(self.#ident as _)
+            } else {
+                quote!(self.#ident)
+            }
+        })
+        .collect();
 
     let after_patch = if let Some(after_fn) = &entity.after_patch {
         quote!(
-            let previous = sqlx::query_as!(Self, #before_patch_sql, #(self.#ident_keys),*)
+            let previous = sqlx::query_as!(Self, #before_patch_sql, #(#ident_keys),*)
                 .fetch_one(&mut *conn)
                 .await?;
 
@@ -174,6 +184,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
             })*
         )
     };
+    let ident_keys: Vec<&Ident> = primary_keys.iter().map(|x| &x.ident).collect();
 
     let ret_type = if let Some(e_type) = &entity.error_type {
         quote!(Result<(), #e_type>)

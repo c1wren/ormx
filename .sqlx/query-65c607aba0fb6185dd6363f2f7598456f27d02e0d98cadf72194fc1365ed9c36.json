@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM all_keys WHERE value = $1 AND  field = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "65c607aba0fb6185dd6363f2f7598456f27d02e0d98cadf72194fc1365ed9c36"
+}

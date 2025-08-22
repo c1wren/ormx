@@ -43,17 +43,27 @@ fn delete_self(entity: &Entity) -> TokenStream {
         quote!()
     };
 
-    let ident_keys: Vec<&Ident> = keys.iter().map(|x| &x.ident).collect();
+    let ident_keys: Vec<_> = keys
+        .iter()
+        .map(|k| {
+            let ident = &k.ident;
+            if k.custom_type {
+                quote!(self.#ident as _)
+            } else {
+                quote!(self.#ident)
+            }
+        })
+        .collect();
 
     let after_delete = if let Some(after_fn) = &entity.after_delete {
         quote!(
-            sqlx::query!(#sql, #(self.#ident_keys),*).execute(&mut *conn).await?;
+            sqlx::query!(#sql, #(#ident_keys),*).execute(&mut *conn).await?;
 
             #after_fn(self, context, conn).await?;
         )
     } else {
         quote!(
-            sqlx::query!(#sql, #(self.#ident_keys),*).execute(conn).await?;
+            sqlx::query!(#sql, #(#ident_keys),*).execute(conn).await?;
         )
     };
 
@@ -69,7 +79,7 @@ fn delete_self(entity: &Entity) -> TokenStream {
                 self,
                 conn: &mut sqlx::PgConnection,
             ) -> #ret_type {
-                sqlx::query!(#sql, #(self.#ident_keys),*).execute(conn).await?;
+                sqlx::query!(#sql, #(#ident_keys),*).execute(conn).await?;
 
                 Ok(())
             }

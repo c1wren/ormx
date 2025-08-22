@@ -71,15 +71,25 @@ pub fn update(entity: &Entity) -> TokenStream {
         quote!()
     };
 
-    let ident_keys: Vec<&Ident> = primary_keys.iter().map(|x| &x.ident).collect();
+    let ident_keys: Vec<_> = primary_keys
+        .iter()
+        .map(|k| {
+            let ident = &k.ident;
+            if k.custom_type {
+                quote!(self.#ident as _)
+            } else {
+                quote!(self.#ident)
+            }
+        })
+        .collect();
 
-    let sqlx_call = quote!(sqlx::query!(#sql, #(self.#ident_keys),*, #(#updatable_fields,)*));
+    let sqlx_call = quote!(sqlx::query!(#sql, #(#ident_keys),*, #(#updatable_fields,)*));
 
     let has_trigger = entity.after_update.is_some() || entity.before_update.is_some();
 
     let after_update = if let Some(after_fn) = &entity.after_update {
         quote!(
-            let previous = sqlx::query_as!(Self, #before_value_sql, #(self.#ident_keys),*)
+            let previous = sqlx::query_as!(Self, #before_value_sql, #(#ident_keys),*)
                 .fetch_one(&mut *conn)
                 .await?;
 

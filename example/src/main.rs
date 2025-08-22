@@ -1,4 +1,5 @@
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use sqlx::{postgres::PgPoolOptions, PgConnection};
 
 mod error;
@@ -320,4 +321,34 @@ impl Composite {
         println!("after insert");
         Ok(())
     }
+}
+
+#[derive(ormx::Entity, sqlx::FromRow, Debug)]
+#[ormx(table = "all_keys", insertable, patchable, deletable)]
+struct AllKeys {
+    #[ormx(key)]
+    value: String,
+    #[ormx(key, custom_type, patchable)]
+    field: CustomType,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Copy, sqlx::Type)]
+#[sqlx(type_name = "text")]
+pub enum CustomType {
+    #[sqlx(rename = "Case1")]
+    #[serde(rename = "Case1")]
+    Case1,
+    #[sqlx(rename = "Case2")]
+    #[serde(rename = "Case2")]
+    Case2,
+}
+
+#[derive(ormx::Entity, sqlx::FromRow, Debug)]
+#[ormx(table = "mostly_keys", insertable, patchable, deletable)]
+struct MostlyKeys {
+    #[ormx(key)]
+    value: String,
+    #[ormx(key, custom_type)]
+    field: CustomType,
+    other: String,
 }

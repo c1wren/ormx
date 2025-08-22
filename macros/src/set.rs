@@ -44,7 +44,17 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
         quote!(Result<(), sqlx::Error>)
     };
 
-    let ident_keys: Vec<&Ident> = primary_keys.iter().map(|x| &x.ident).collect();
+    let ident_keys: Vec<_> = primary_keys
+        .iter()
+        .map(|k| {
+            let ident = &k.ident;
+            if k.custom_type {
+                quote!(self.#ident as _)
+            } else {
+                quote!(self.#ident)
+            }
+        })
+        .collect();
 
     let before_update = if let Some(before_fn) = &entity.before_update {
         quote!(
@@ -60,7 +70,7 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
         quote!(
             let previous = self.clone();
 
-            sqlx::query!(#query, #value_converter, #(&self.#ident_keys),*)
+            sqlx::query!(#query, #value_converter, #(#ident_keys),*)
                 .execute(&mut *conn)
                 .await?;
             self.#field_ident = value;
@@ -69,7 +79,7 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
         )
     } else {
         quote!(
-            sqlx::query!(#query, #value_converter, #(&self.#ident_keys),*)
+            sqlx::query!(#query, #value_converter, #(#ident_keys),*)
                 .execute(conn)
                 .await?;
             self.#field_ident = value;
@@ -88,7 +98,7 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
                 conn: &mut sqlx::PgConnection,
                 value: #field_ty
             ) -> #ret_type {
-                sqlx::query!(#query, #value_converter, #(&self.#ident_keys),*)
+                sqlx::query!(#query, #value_converter, #(#ident_keys),*)
                     .execute(conn)
                     .await?;
                 self.#field_ident = value;
