@@ -74,10 +74,12 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
     let vis = &entity.vis;
 
     let column_building = entity.patchable_fields().map(|field| {
-        let ident = field.fmt_for_select();
+        let ident = &field.ident;
+        let column = field.fmt_for_select();
+
         quote!(
             if self.#ident.is_some() {
-                columns.push(format!("{} = ${}", ident, count));
+                columns.push(format!("{} = ${}", #column, count));
                 count += 1;
             }
         )
