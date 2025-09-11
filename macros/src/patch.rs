@@ -75,7 +75,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
 
     let column_building = entity.patchable_fields().map(|field| {
         let ident = &field.ident;
-        let column = field.fmt_for_select();
+        let column = ident.to_string().replace("r#", "");
 
         quote!(
             if self.#ident.is_some() {
