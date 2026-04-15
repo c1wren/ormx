@@ -1,4 +1,5 @@
 use crate::attrs::{ConvertType, EntityAttr, FieldAttr};
+use crate::transform::count_transform_params;
 use proc_macro2::Span;
 use std::convert::TryFrom;
 use syn::spanned::Spanned;
@@ -12,6 +13,10 @@ pub struct EntityField {
     pub set: Option<Ident>,
     pub delete: Option<Ident>,
     pub convert: Option<ConvertType>,
+    pub transform_get: Option<String>,
+    pub transform_set: Option<String>,
+    pub transform_get_params: Option<ExprPath>,
+    pub transform_set_params: Option<ExprPath>,
     pub column_name: String,
     pub ident: Ident,
     pub ty: Type,
@@ -34,6 +39,17 @@ impl EntityField {
             format!("{} AS {}", column_name, ident)
         } else {
             ident
+        }
+    }
+
+    pub fn fmt_expression_alias(&self) -> String {
+        let ident = self.ident.to_string().replace("r#", "");
+        let nullable_suffix = if is_option_type(&self.ty) { "?" } else { "!" };
+
+        if self.custom_type {
+            format!(r#""{}{}: _""#, ident, nullable_suffix)
+        } else {
+            format!(r#""{}{}""#, ident, nullable_suffix)
         }
     }
 }
@@ -93,6 +109,10 @@ impl TryFrom<&Field> for EntityField {
             delete: None,
             set: None,
             convert: None,
+            transform_get: None,
+            transform_set: None,
+            transform_get_params: None,
+            transform_set_params: None,
             ty: field.ty.clone(),
             column_name: ident.to_string(),
             ident: ident.clone(),
@@ -147,8 +167,38 @@ impl TryFrom<&Field> for EntityField {
                     result.custom_type = true;
                 }
                 FieldAttr::Convert(function) => result.convert = Some(function),
+                FieldAttr::TransformGet(transform) => result.transform_get = Some(transform),
+                FieldAttr::TransformSet(transform) => result.transform_set = Some(transform),
+                FieldAttr::TransformGetParams(params) => {
+                    result.transform_get_params = Some(params);
+                }
+                FieldAttr::TransformSetParams(params) => {
+                    result.transform_set_params = Some(params);
+                }
             }
         }
+
+        if result.convert.is_some()
+            && (result.transform_get.is_some() || result.transform_set.is_some())
+        {
+            return Err(Error::new(
+                field.span(),
+                "Cannot use transform and convert on the same field.",
+            ));
+        }
+
+        validate_transform(
+            field,
+            "transform_get",
+            result.transform_get.as_deref(),
+            result.transform_get_params.as_ref(),
+        )?;
+        validate_transform(
+            field,
+            "transform_set",
+            result.transform_set.as_deref(),
+            result.transform_set_params.as_ref(),
+        )?;
 
         if result.is_key && !has_updatable_set {
             result.updatable = false;
@@ -299,4 +349,43 @@ fn missing_attr(name: &str) -> Error {
         Span::call_site(),
         format!(r#"missing #[ormx({} = "..")) attribute"#, name),
     )
+}
+
+fn is_option_type(ty: &Type) -> bool {
+    let Type::Path(type_path) = ty else {
+        return false;
+    };
+
+    let Some(segment) = type_path.path.segments.last() else {
+        return false;
+    };
+
+    segment.ident == "Option"
+}
+
+fn validate_transform(
+    field: &Field,
+    attr_name: &str,
+    template: Option<&str>,
+    params_fn: Option<&ExprPath>,
+) -> Result<()> {
+    let Some(template) = template else {
+        if params_fn.is_some() {
+            return Err(Error::new(
+                field.span(),
+                format!("{attr_name}_params requires {attr_name}."),
+            ));
+        }
+        return Ok(());
+    };
+
+    let required_params = count_transform_params(template);
+    if required_params > 0 && params_fn.is_none() {
+        return Err(Error::new(
+            field.span(),
+            format!("Field uses $param placeholders but {attr_name}_params is not provided."),
+        ));
+    }
+
+    Ok(())
 }

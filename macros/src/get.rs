@@ -1,5 +1,5 @@
+use crate::transform::{build_select_clause, transform_bind_expressions, TransformBinding};
 use crate::{attrs::ConvertType, Entity, EntityField};
-use itertools::Itertools;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::Ident;
@@ -38,7 +38,11 @@ fn get_all(entity: &Entity) -> TokenStream2 {
         Some(ident) => ident,
         None => return quote!(),
     };
-    let sql = build_select_query(entity, None);
+    let (sql, bindings) = match build_select_query(entity, None) {
+        Ok(parts) => parts,
+        Err(err) => return err.to_compile_error(),
+    };
+    let transform_binds = transform_bind_expressions(&bindings);
     let vis = &entity.vis;
 
     let ret_type = if let Some(e_type) = &entity.error_type {
@@ -49,13 +53,13 @@ fn get_all(entity: &Entity) -> TokenStream2 {
 
     let call = if entity.error_type.is_some() {
         quote! {
-            Ok(sqlx::query_as!(Self, #sql)
+            Ok(sqlx::query_as!(Self, #sql #(, #transform_binds)*)
                 .fetch_all(conn)
                 .await?)
         }
     } else {
         quote! {
-            sqlx::query_as!(Self, #sql)
+            sqlx::query_as!(Self, #sql #(, #transform_binds)*)
                 .fetch_all(conn)
                 .await
         }
@@ -73,7 +77,11 @@ fn get_all(entity: &Entity) -> TokenStream2 {
 fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     let val = &field.ty;
     let vis = &entity.vis;
-    let query = build_select_query(entity, Some(field));
+    let (query, bindings) = match build_select_query(entity, Some(field)) {
+        Ok(parts) => parts,
+        Err(err) => return err.to_compile_error(),
+    };
+    let transform_binds = transform_bind_expressions(&bindings);
 
     let by_converter = match &field.convert {
         Some(ConvertType::As(t)) => quote! { *val as #t },
@@ -89,13 +97,13 @@ fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
 
     let call = if entity.error_type.is_some() {
         quote! {
-            Ok(sqlx::query_as!(Self, #query, #by_converter)
+            Ok(sqlx::query_as!(Self, #query, #by_converter #(, #transform_binds)*)
                 .fetch_one(conn)
                 .await?)
         }
     } else {
         quote! {
-            sqlx::query_as!(Self, #query, #by_converter)
+            sqlx::query_as!(Self, #query, #by_converter #(, #transform_binds)*)
                 .fetch_one(conn)
                 .await
         }
@@ -114,7 +122,11 @@ fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
 fn optional(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     let val = &field.ty;
     let vis = &entity.vis;
-    let query = build_select_query(entity, Some(field));
+    let (query, bindings) = match build_select_query(entity, Some(field)) {
+        Ok(parts) => parts,
+        Err(err) => return err.to_compile_error(),
+    };
+    let transform_binds = transform_bind_expressions(&bindings);
 
     let by_converter = match &field.convert {
         Some(ConvertType::As(t)) => quote! { *val as #t },
@@ -130,13 +142,13 @@ fn optional(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStrea
 
     let call = if entity.error_type.is_some() {
         quote! {
-            Ok(sqlx::query_as!(Self, #query, #by_converter)
+            Ok(sqlx::query_as!(Self, #query, #by_converter #(, #transform_binds)*)
                 .fetch_optional(conn)
                 .await?)
         }
     } else {
         quote! {
-            sqlx::query_as!(Self, #query, #by_converter)
+            sqlx::query_as!(Self, #query, #by_converter #(, #transform_binds)*)
                 .fetch_optional(conn)
                 .await
         }
@@ -155,7 +167,11 @@ fn optional(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStrea
 fn many(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     let val = &field.ty;
     let vis = &entity.vis;
-    let query = build_select_query(entity, Some(field));
+    let (query, bindings) = match build_select_query(entity, Some(field)) {
+        Ok(parts) => parts,
+        Err(err) => return err.to_compile_error(),
+    };
+    let transform_binds = transform_bind_expressions(&bindings);
 
     let by_converter = match &field.convert {
         Some(ConvertType::As(t)) => quote! { *val as #t },
@@ -171,13 +187,13 @@ fn many(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
 
     let call = if entity.error_type.is_some() {
         quote! {
-            Ok(sqlx::query_as!(Self, #query, #by_converter)
+            Ok(sqlx::query_as!(Self, #query, #by_converter #(, #transform_binds)*)
                 .fetch_all(conn)
                 .await?)
         }
     } else {
         quote! {
-            sqlx::query_as!(Self, #query, #by_converter)
+            sqlx::query_as!(Self, #query, #by_converter #(, #transform_binds)*)
                 .fetch_all(conn)
                 .await
         }
@@ -193,19 +209,25 @@ fn many(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     }
 }
 
-fn build_select_query(entity: &Entity, val: Option<&EntityField>) -> String {
-    let columns = entity
-        .fields
-        .iter()
-        .map(EntityField::fmt_for_select)
-        .join(", ");
+fn build_select_query(
+    entity: &Entity,
+    val: Option<&EntityField>,
+) -> syn::Result<(String, Vec<TransformBinding>)> {
+    let initial_offset = usize::from(val.is_some());
+    let (columns, bindings, _) = build_select_clause(&entity.fields, initial_offset)?;
 
     if let Some(val) = val {
-        format!(
-            "SELECT {} FROM {} WHERE {} = $1",
-            columns, entity.table_name, val.column_name
-        )
+        Ok((
+            format!(
+                "SELECT {} FROM {} WHERE {} = $1",
+                columns, entity.table_name, val.column_name
+            ),
+            bindings,
+        ))
     } else {
-        format!("SELECT {} FROM {}", columns, entity.table_name)
+        Ok((
+            format!("SELECT {} FROM {}", columns, entity.table_name),
+            bindings,
+        ))
     }
 }

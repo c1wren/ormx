@@ -15,6 +15,7 @@ mod get;
 mod insert;
 mod patch;
 mod set;
+mod transform;
 mod update;
 
 fn derive_entity(input: DeriveInput) -> Result<TokenStream2> {

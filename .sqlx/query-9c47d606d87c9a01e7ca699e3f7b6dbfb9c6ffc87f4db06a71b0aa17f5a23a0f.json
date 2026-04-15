@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO clubs (name, test1, test2, test4, type) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, test1 AS test_rename, test2 AS \"test2: _\", test3, test4, type",
+  "query": "SELECT id, name, test1 AS test_rename, test2 AS \"test2: _\", test3, test4, type, pgp_sym_decrypt(encrypted::bytea, $2::text) AS \"encrypted!\" FROM clubs WHERE test2 = $1",
   "describe": {
     "columns": [
       {
@@ -37,15 +37,17 @@
         "ordinal": 6,
         "name": "type",
         "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "encrypted!",
+        "type_info": "Text"
       }
     ],
     "parameters": {
       "Left": [
-        "Text",
-        "Text",
         "Int4",
-        "Int4Array",
-        "Int4"
+        "Text"
       ]
     },
     "nullable": [
@@ -55,8 +57,9 @@
       false,
       true,
       true,
-      false
+      false,
+      null
     ]
   },
-  "hash": "a9c6b4576d406978c5c67a909dda3108177da2290ae4a60e5c216886033d27a0"
+  "hash": "9c47d606d87c9a01e7ca699e3f7b6dbfb9c6ffc87f4db06a71b0aa17f5a23a0f"
 }

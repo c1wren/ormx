@@ -68,6 +68,10 @@ pub enum FieldAttr {
     Key,
     Default,
     CustomType,
+    TransformGet(String),
+    TransformSet(String),
+    TransformGetParams(ExprPath),
+    TransformSetParams(ExprPath),
 }
 
 #[derive(Clone)]
@@ -91,6 +95,10 @@ impl Parse for FieldAttr {
             "default" => Default,
             "key" => Key,
             "custom_type" => CustomType,
+            "transform_get" => TransformGet(assign_string(ident.span(), &input)?),
+            "transform_set" => TransformSet(assign_string(ident.span(), &input)?),
+            "transform_get_params" => TransformGetParams(assign_expr_path(ident.span(), &input)?),
+            "transform_set_params" => TransformSetParams(assign_expr_path(ident.span(), &input)?),
             "patchable" => Patchable(opt_assign_bool(&input)?.unwrap_or(true)),
             "updatable" => Updatable(opt_assign_bool(&input)?.unwrap_or(true)),
             "convert" => Convert(ConvertType::Function(assign_expr_path(

@@ -35,13 +35,16 @@ async fn main() -> Result<()> {
         test2: TestEnum::Test2,
         test4: Some(vec![1, 2, 3, 4]),
         r#type: 3,
+        encrypted: "hello".to_string(),
     }
     .insert(&mut *db_pool.acquire().await?)
     .await?;
     dbg!(&club);
 
     // test patching
-    let patch = PatchClub::default().set_name("New Name".into());
+    let patch = PatchClub::default()
+        .set_name("New Name".into())
+        .set_encrypted("new hello".to_string());
     club.patch(&mut *db_pool.acquire().await?, patch).await?;
     dbg!(club);
 
@@ -127,6 +130,21 @@ struct Club {
     #[ormx(convert = "my_convert")]
     test4: Option<Vec<i32>>,
     r#type: i32,
+    #[ormx(
+        transform_get = "pgp_sym_decrypt($field::bytea, $param1::text)",
+        transform_get_params = "my_getter_params",
+        transform_set = "pgp_sym_encrypt($field::text, $param1::text)",
+        transform_set_params = "my_setter_params"
+    )]
+    encrypted: String,
+}
+
+fn my_getter_params() -> (String,) {
+    ("mykey".to_string(),)
+}
+
+fn my_setter_params() -> (String,) {
+    ("mykey".to_string(),)
 }
 
 impl Club {

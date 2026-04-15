@@ -1,5 +1,7 @@
+use crate::transform::{
+    build_select_clause, count_transform_params, runtime_transform_expr, transform_bind_expressions,
+};
 use crate::{attrs::ConvertType, Entity, EntityField};
-use itertools::Itertools;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::Ident;
@@ -69,20 +71,41 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
     if patchable_fields.is_empty() {
         return quote! {};
     }
+
+    let primary_keys: Vec<&EntityField> = entity.fields.iter().filter(|x| x.is_key).collect();
+    let primary_key_idents: Vec<&Ident> = primary_keys.iter().map(|x| &x.ident).collect();
     let entity_ident = &entity.ident;
     let table_name = &entity.table_name;
     let vis = &entity.vis;
 
     let column_building = entity.patchable_fields().map(|field| {
         let ident = &field.ident;
-        let column = ident.to_string().replace("r#", "");
+        let column_name = field.column_name.replace("r#", "");
 
-        quote!(
-            if self.#ident.is_some() {
-                columns.push(format!("{} = ${}", #column, count));
-                count += 1;
+        if let Some(transform_set) = &field.transform_set {
+            let max_param = count_transform_params(transform_set);
+            let transform_expr = runtime_transform_expr(
+                transform_set,
+                quote!(format!("${}", value_index)),
+                quote!(transform_param_offset),
+                max_param,
+            );
+            quote! {
+                if self.#ident.is_some() {
+                    let expr = #transform_expr;
+                    columns.push(format!("{} = {}", #column_name, expr));
+                    value_index += 1;
+                    transform_param_offset += #max_param;
+                }
             }
-        )
+        } else {
+            quote! {
+                if self.#ident.is_some() {
+                    columns.push(format!("{} = ${}", #column_name, value_index));
+                    value_index += 1;
+                }
+            }
+        }
     });
 
     let binding = entity.patchable_fields().map(|field| {
@@ -93,21 +116,37 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
             None => quote! { value },
         };
 
-        quote!(
+        quote! {
             if let Some(value) = self.#ident.as_ref() {
                 query = query.bind(#value_getter);
             }
-        )
+        }
     });
 
-    let columns = entity
-        .fields
-        .iter()
-        .map(EntityField::fmt_for_select)
-        .join(", ");
+    let transform_bindings = entity.patchable_fields().filter_map(|field| {
+        let ident = &field.ident;
+        let params_fn = field.transform_set_params.as_ref()?;
+        let count = count_transform_params(field.transform_set.as_ref()?);
+        let bind_params = (0..count).map(|i| {
+            let index = syn::Index::from(i);
+            quote! {
+                query = query.bind(transform_params.#index);
+            }
+        });
+        Some(quote! {
+            if self.#ident.is_some() {
+                let transform_params = #params_fn();
+                #(#bind_params)*
+            }
+        })
+    });
 
-    let primary_keys: Vec<&EntityField> = entity.fields.iter().filter(|x| x.is_key).collect();
-    let num_keys = primary_keys.len() + 1;
+    let (columns, before_patch_bindings, _) =
+        match build_select_clause(&entity.fields, primary_keys.len()) {
+            Ok(parts) => parts,
+            Err(err) => return err.to_compile_error(),
+        };
+    let before_patch_transform_binds = transform_bind_expressions(&before_patch_bindings);
 
     let mut patch_sql_statement = String::from("UPDATE {} SET {} WHERE");
     let mut before_patch_sql = format!("SELECT {} FROM {} WHERE", columns, entity.table_name);
@@ -135,20 +174,12 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
 
     let mut items = Vec::new();
     for (ident, _) in keys.clone() {
-        let stream = quote! {
-            &self.#ident
-        };
-
-        items.push(stream);
+        items.push(quote! { &self.#ident });
     }
 
     let mut fn_items = Vec::new();
     for (ident, ty) in keys {
-        let stream = quote! {
-            #ident: &#ty
-        };
-
-        fn_items.push(stream);
+        fn_items.push(quote! { #ident: &#ty });
     }
 
     let ident_keys: Vec<_> = primary_keys
@@ -158,16 +189,21 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
             if k.custom_type {
                 quote!(self.#ident as _)
             } else {
-                quote!(self.#ident)
+                quote!(&self.#ident)
             }
         })
         .collect();
 
     let after_patch = if let Some(after_fn) = &entity.after_patch {
         quote!(
-            let previous = sqlx::query_as!(Self, #before_patch_sql, #(#ident_keys),*)
-                .fetch_one(&mut *conn)
-                .await?;
+            let previous = sqlx::query_as!(
+                Self,
+                #before_patch_sql,
+                #(#ident_keys),*
+                #(, #before_patch_transform_binds)*
+            )
+            .fetch_one(&mut *conn)
+            .await?;
 
             #patch_struct_ident::patch(&patch, &mut *conn, #( #items ),*).await?;
 
@@ -186,7 +222,6 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
             })*
         )
     };
-    let ident_keys: Vec<&Ident> = primary_keys.iter().map(|x| &x.ident).collect();
 
     let ret_type = if let Some(e_type) = &entity.error_type {
         quote!(Result<(), #e_type>)
@@ -227,9 +262,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
                 context: Option<&#context_type>,
             ) -> #ret_type {
                 #before_patch
-
                 #after_patch
-
                 Ok(())
             }
         }
@@ -247,6 +280,9 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         quote! { let context = None::<_>; }
     };
 
+    let num_keys = primary_keys.len() + 1;
+    let key_count = primary_keys.len();
+
     quote! {
         impl #patch_struct_ident {
             #vis async fn patch(
@@ -255,16 +291,18 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
                 #( #fn_items ),*,
             ) -> #ret_type {
                 let mut columns = vec![];
-                let mut count = #num_keys;
+                let selected_fields = 0 #( + usize::from(self.#patchable_fields.is_some()) )*;
+                let mut value_index = #num_keys;
+                let mut transform_param_offset = #key_count + selected_fields;
 
                 #(#column_building)*
 
                 let columns = columns.join(", ");
-
                 let sql = format!(#patch_sql_statement, #table_name, columns);
 
-                let mut query = sqlx::query(&sql)#(.bind(#ident_keys))*;
+                let mut query = sqlx::query::<sqlx::Postgres>(&sql)#(.bind(#primary_key_idents))*;
                 #(#binding)*
+                #(#transform_bindings)*
 
                 query.execute(conn).await?;
 
@@ -280,11 +318,8 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
                 patch: #patch_struct_ident,
             ) -> #ret_type {
                 #context
-
                 #before_patch
-
                 #after_patch
-
                 Ok(())
             }
 

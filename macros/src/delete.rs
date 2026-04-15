@@ -58,7 +58,6 @@ fn delete_self(entity: &Entity) -> TokenStream {
     let after_delete = if let Some(after_fn) = &entity.after_delete {
         quote!(
             sqlx::query!(#sql, #(#ident_keys),*).execute(&mut *conn).await?;
-
             #after_fn(self, context, conn).await?;
         )
     } else {
@@ -80,7 +79,6 @@ fn delete_self(entity: &Entity) -> TokenStream {
                 conn: &mut sqlx::PgConnection,
             ) -> #ret_type {
                 sqlx::query!(#sql, #(#ident_keys),*).execute(conn).await?;
-
                 Ok(())
             }
         }
@@ -158,7 +156,7 @@ fn delete_by(entity: &Entity, val: &EntityField, fn_name: &Ident) -> TokenStream
         ) -> #ret_type {
             use sqlx::Done;
 
-            let result = sqlx::query!(#sql, by).execute(conn).await?;
+            let result = sqlx::query!(#sql, val).execute(conn).await?;
 
             Ok(result.rows_affected())
         }
