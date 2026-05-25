@@ -300,7 +300,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
                 let columns = columns.join(", ");
                 let sql = format!(#patch_sql_statement, #table_name, columns);
 
-                let mut query = sqlx::query::<sqlx::Postgres>(&sql)#(.bind(#primary_key_idents))*;
+                let mut query = sqlx::query::<sqlx::Postgres>(sqlx::AssertSqlSafe(sql))#(.bind(#primary_key_idents))*;
                 #(#binding)*
                 #(#transform_bindings)*
 

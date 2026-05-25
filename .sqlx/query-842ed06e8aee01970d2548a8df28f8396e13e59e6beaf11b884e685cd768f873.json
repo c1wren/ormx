@@ -6,17 +6,35 @@
       {
         "ordinal": 0,
         "name": "value",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mostly_keys",
+            "name": "value"
+          }
+        }
       },
       {
         "ordinal": 1,
         "name": "field: _",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mostly_keys",
+            "name": "field"
+          }
+        }
       },
       {
         "ordinal": 2,
         "name": "other",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mostly_keys",
+            "name": "other"
+          }
+        }
       }
     ],
     "parameters": {
