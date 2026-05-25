@@ -1,0 +1,54 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO mostly_keys (value, field, other) VALUES ($1, $2, $3) RETURNING value, field AS \"field: _\", other",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "value",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mostly_keys",
+            "name": "value"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "field: _",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mostly_keys",
+            "name": "field"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "other",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mostly_keys",
+            "name": "other"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "842ed06e8aee01970d2548a8df28f8396e13e59e6beaf11b884e685cd768f873"
+}

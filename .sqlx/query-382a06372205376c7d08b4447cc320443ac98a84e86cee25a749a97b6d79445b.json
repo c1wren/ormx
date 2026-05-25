@@ -1,0 +1,54 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO composite (name, other, non_key) VALUES ($1, $2, $3) RETURNING name, other, non_key",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "composite",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "other",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "composite",
+            "name": "other"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "non_key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "composite",
+            "name": "non_key"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "382a06372205376c7d08b4447cc320443ac98a84e86cee25a749a97b6d79445b"
+}

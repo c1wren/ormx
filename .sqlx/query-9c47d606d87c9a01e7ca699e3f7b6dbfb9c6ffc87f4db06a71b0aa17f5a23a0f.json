@@ -1,0 +1,108 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, name, test1 AS test_rename, test2 AS \"test2: _\", test3, test4, type, pgp_sym_decrypt(encrypted::bytea, $2::text) AS \"encrypted!\" FROM clubs WHERE test2 = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "clubs",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "clubs",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "test_rename",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "clubs",
+            "name": "test1"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "test2: _",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "clubs",
+            "name": "test2"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "test3",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "clubs",
+            "name": "test3"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "test4",
+        "type_info": "Int4Array",
+        "origin": {
+          "Table": {
+            "table": "clubs",
+            "name": "test4"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "type",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "clubs",
+            "name": "type"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "encrypted!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      null
+    ]
+  },
+  "hash": "9c47d606d87c9a01e7ca699e3f7b6dbfb9c6ffc87f4db06a71b0aa17f5a23a0f"
+}

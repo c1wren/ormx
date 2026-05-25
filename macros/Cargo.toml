@@ -1,6 +1,6 @@
 [package]
 name = "macros"
-version = "0.2.1"
+version = "0.3.1"
 authors = ["Caleb Wren <caleb_wren@me.com>"]
 edition = "2021"
 
@@ -12,4 +12,4 @@ proc-macro = true
 syn = "2.0"
 quote = "1.0"
 proc-macro2 = "1.0"
-itertools = "0.12.0"
+itertools = "0.14.0"

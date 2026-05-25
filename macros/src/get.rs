@@ -1,5 +1,5 @@
+use crate::transform::{build_select_clause, transform_bind_expressions, TransformBinding};
 use crate::{attrs::ConvertType, Entity, EntityField};
-use itertools::Itertools;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::Ident;
@@ -21,10 +21,7 @@ pub fn getters(entity: &Entity) -> TokenStream2 {
                 .get_many
                 .as_ref()
                 .map(|name| many(entity, field, name));
-            get_one
-                .into_iter()
-                .chain(get_optional.into_iter())
-                .chain(get_many.into_iter())
+            get_one.into_iter().chain(get_optional).chain(get_many)
         })
         .collect::<TokenStream2>();
 
@@ -41,7 +38,11 @@ fn get_all(entity: &Entity) -> TokenStream2 {
         Some(ident) => ident,
         None => return quote!(),
     };
-    let sql = build_select_query(entity, None);
+    let (sql, bindings) = match build_select_query(entity, None) {
+        Ok(parts) => parts,
+        Err(err) => return err.to_compile_error(),
+    };
+    let transform_binds = transform_bind_expressions(&bindings);
     let vis = &entity.vis;
 
     let ret_type = if let Some(e_type) = &entity.error_type {
@@ -50,13 +51,25 @@ fn get_all(entity: &Entity) -> TokenStream2 {
         quote!(Result<Vec<Self>, sqlx::Error>)
     };
 
+    let call = if entity.error_type.is_some() {
+        quote! {
+            Ok(sqlx::query_as!(Self, #sql #(, #transform_binds)*)
+                .fetch_all(conn)
+                .await?)
+        }
+    } else {
+        quote! {
+            sqlx::query_as!(Self, #sql #(, #transform_binds)*)
+                .fetch_all(conn)
+                .await
+        }
+    };
+
     quote! {
         #vis async fn #fn_name(
             conn: &mut sqlx::PgConnection
         ) -> #ret_type {
-            Ok(sqlx::query_as!(Self, #sql)
-                .fetch_all(conn)
-                .await?)
+            #call
         }
     }
 }
@@ -64,7 +77,11 @@ fn get_all(entity: &Entity) -> TokenStream2 {
 fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     let val = &field.ty;
     let vis = &entity.vis;
-    let query = build_select_query(entity, Some(field));
+    let (query, bindings) = match build_select_query(entity, Some(field)) {
+        Ok(parts) => parts,
+        Err(err) => return err.to_compile_error(),
+    };
+    let transform_binds = transform_bind_expressions(&bindings);
 
     let by_converter = match &field.convert {
         Some(ConvertType::As(t)) => quote! { *val as #t },
@@ -78,14 +95,26 @@ fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
         quote!(Result<Self, sqlx::Error>)
     };
 
+    let call = if entity.error_type.is_some() {
+        quote! {
+            Ok(sqlx::query_as!(Self, #query, #by_converter #(, #transform_binds)*)
+                .fetch_one(conn)
+                .await?)
+        }
+    } else {
+        quote! {
+            sqlx::query_as!(Self, #query, #by_converter #(, #transform_binds)*)
+                .fetch_one(conn)
+                .await
+        }
+    };
+
     quote! {
         #vis async fn #fn_name(
             conn: &mut sqlx::PgConnection,
             val: &#val
         ) -> #ret_type {
-            Ok(sqlx::query_as!(Self, #query, #by_converter)
-                .fetch_one(conn)
-                .await?)
+            #call
         }
     }
 }
@@ -93,7 +122,11 @@ fn single(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
 fn optional(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     let val = &field.ty;
     let vis = &entity.vis;
-    let query = build_select_query(entity, Some(field));
+    let (query, bindings) = match build_select_query(entity, Some(field)) {
+        Ok(parts) => parts,
+        Err(err) => return err.to_compile_error(),
+    };
+    let transform_binds = transform_bind_expressions(&bindings);
 
     let by_converter = match &field.convert {
         Some(ConvertType::As(t)) => quote! { *val as #t },
@@ -107,14 +140,26 @@ fn optional(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStrea
         quote!(Result<Option<Self>, sqlx::Error>)
     };
 
+    let call = if entity.error_type.is_some() {
+        quote! {
+            Ok(sqlx::query_as!(Self, #query, #by_converter #(, #transform_binds)*)
+                .fetch_optional(conn)
+                .await?)
+        }
+    } else {
+        quote! {
+            sqlx::query_as!(Self, #query, #by_converter #(, #transform_binds)*)
+                .fetch_optional(conn)
+                .await
+        }
+    };
+
     quote! {
         #vis async fn #fn_name(
             conn: &mut sqlx::PgConnection,
             val: &#val
         ) -> #ret_type {
-            Ok(sqlx::query_as!(Self, #query, #by_converter)
-                .fetch_optional(conn)
-                .await?)
+            #call
         }
     }
 }
@@ -122,7 +167,11 @@ fn optional(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStrea
 fn many(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
     let val = &field.ty;
     let vis = &entity.vis;
-    let query = build_select_query(entity, Some(field));
+    let (query, bindings) = match build_select_query(entity, Some(field)) {
+        Ok(parts) => parts,
+        Err(err) => return err.to_compile_error(),
+    };
+    let transform_binds = transform_bind_expressions(&bindings);
 
     let by_converter = match &field.convert {
         Some(ConvertType::As(t)) => quote! { *val as #t },
@@ -136,31 +185,49 @@ fn many(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
         quote!(Result<Vec<Self>, sqlx::Error>)
     };
 
+    let call = if entity.error_type.is_some() {
+        quote! {
+            Ok(sqlx::query_as!(Self, #query, #by_converter #(, #transform_binds)*)
+                .fetch_all(conn)
+                .await?)
+        }
+    } else {
+        quote! {
+            sqlx::query_as!(Self, #query, #by_converter #(, #transform_binds)*)
+                .fetch_all(conn)
+                .await
+        }
+    };
+
     quote! {
         #vis async fn #fn_name(
             conn: &mut sqlx::PgConnection,
             val: &#val
         ) -> #ret_type {
-            Ok(sqlx::query_as!(Self, #query, #by_converter)
-                .fetch_all(conn)
-                .await?)
+            #call
         }
     }
 }
 
-fn build_select_query(entity: &Entity, val: Option<&EntityField>) -> String {
-    let columns = entity
-        .fields
-        .iter()
-        .map(EntityField::fmt_for_select)
-        .join(", ");
+fn build_select_query(
+    entity: &Entity,
+    val: Option<&EntityField>,
+) -> syn::Result<(String, Vec<TransformBinding>)> {
+    let initial_offset = usize::from(val.is_some());
+    let (columns, bindings, _) = build_select_clause(&entity.fields, initial_offset)?;
 
     if let Some(val) = val {
-        format!(
-            "SELECT {} FROM {} WHERE {} = $1",
-            columns, entity.table_name, val.column_name
-        )
+        Ok((
+            format!(
+                "SELECT {} FROM {} WHERE {} = $1",
+                columns, entity.table_name, val.column_name
+            ),
+            bindings,
+        ))
     } else {
-        format!("SELECT {} FROM {}", columns, entity.table_name)
+        Ok((
+            format!("SELECT {} FROM {}", columns, entity.table_name),
+            bindings,
+        ))
     }
 }

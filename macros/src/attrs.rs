@@ -5,7 +5,6 @@ use syn::{Attribute, Error, ExprPath, LitBool, LitStr, Result, Token};
 
 pub enum EntityAttr {
     Table(String),
-    Id(Ident),
     Update(Option<Ident>),
     Insertable(Option<Ident>),
     Patchable(Option<Ident>),
@@ -20,6 +19,7 @@ pub enum EntityAttr {
     BeforeDelete(ExprPath),
     AfterDelete(ExprPath),
     ErrorType(Ident),
+    ContextType(Ident),
 }
 
 impl Parse for EntityAttr {
@@ -29,7 +29,6 @@ impl Parse for EntityAttr {
         let ident = input.parse::<Ident>()?;
         let attr = match &*ident.to_string() {
             "table" => Table(assign_string(ident.span(), &input)?),
-            "id" => Id(assign_ident(ident.span(), &input)?),
             "update" => Update(opt_assign_ident(&input)?),
             "insertable" => Insertable(opt_assign_ident(&input)?),
             "patchable" => Patchable(opt_assign_ident(&input)?),
@@ -44,6 +43,7 @@ impl Parse for EntityAttr {
             "before_delete" => BeforeDelete(assign_expr_path(ident.span(), &input)?),
             "after_delete" => AfterDelete(assign_expr_path(ident.span(), &input)?),
             "error_type" => ErrorType(assign_ident(ident.span(), &input)?),
+            "context_type" => ContextType(assign_ident(ident.span(), &input)?),
             other => {
                 return Err(Error::new(
                     ident.span(),
@@ -65,8 +65,13 @@ pub enum FieldAttr {
     Updatable(bool),
     Patchable(bool),
     Convert(ConvertType),
+    Key,
     Default,
     CustomType,
+    TransformGet(String),
+    TransformSet(String),
+    TransformGetParams(ExprPath),
+    TransformSetParams(ExprPath),
 }
 
 #[derive(Clone)]
@@ -88,7 +93,12 @@ impl Parse for FieldAttr {
             "get_many" => GetMany(opt_assign_ident(&input)?),
             "delete" => Delete(opt_assign_ident(&input)?),
             "default" => Default,
+            "key" => Key,
             "custom_type" => CustomType,
+            "transform_get" => TransformGet(assign_string(ident.span(), &input)?),
+            "transform_set" => TransformSet(assign_string(ident.span(), &input)?),
+            "transform_get_params" => TransformGetParams(assign_expr_path(ident.span(), &input)?),
+            "transform_set_params" => TransformSetParams(assign_expr_path(ident.span(), &input)?),
             "patchable" => Patchable(opt_assign_bool(&input)?.unwrap_or(true)),
             "updatable" => Updatable(opt_assign_bool(&input)?.unwrap_or(true)),
             "convert" => Convert(ConvertType::Function(assign_expr_path(

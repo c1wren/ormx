@@ -24,31 +24,45 @@ pub fn delete(entity: &Entity) -> TokenStream {
 
 fn delete_self(entity: &Entity) -> TokenStream {
     let vis = &entity.vis;
-    let id_ident = &entity.id.ident;
-    let sql = format!(
-        "DELETE FROM {} WHERE {} = $1",
-        entity.table_name, entity.id.column_name
-    );
+    let mut sql = format!("DELETE FROM {} WHERE", entity.table_name);
+    let keys: Vec<&EntityField> = entity.fields.iter().filter(|x| x.is_key).collect();
+    for (index, key) in keys.iter().enumerate() {
+        sql.push_str(format!(" {} = ${}", key.column_name, index + 1).as_str());
+        if index + 1 != keys.len() {
+            sql.push_str(" AND ")
+        }
+    }
 
     let has_trigger = entity.before_delete.is_some() || entity.after_delete.is_some();
 
     let before_delete = if let Some(before_fn) = &entity.before_delete {
         quote!(
-            #before_fn(&self, &mut *conn).await?;
+            #before_fn(&self, context, &mut *conn).await?;
         )
     } else {
         quote!()
     };
 
+    let ident_keys: Vec<_> = keys
+        .iter()
+        .map(|k| {
+            let ident = &k.ident;
+            if k.custom_type {
+                quote!(self.#ident as _)
+            } else {
+                quote!(self.#ident)
+            }
+        })
+        .collect();
+
     let after_delete = if let Some(after_fn) = &entity.after_delete {
         quote!(
-            sqlx::query!(#sql, self.#id_ident).execute(&mut *conn).await?;
-
-            #after_fn(self, conn).await?;
+            sqlx::query!(#sql, #(#ident_keys),*).execute(&mut *conn).await?;
+            #after_fn(self, context, conn).await?;
         )
     } else {
         quote!(
-            sqlx::query!(#sql, self.#id_ident).execute(conn).await?;
+            sqlx::query!(#sql, #(#ident_keys),*).execute(conn).await?;
         )
     };
 
@@ -64,13 +78,40 @@ fn delete_self(entity: &Entity) -> TokenStream {
                 self,
                 conn: &mut sqlx::PgConnection,
             ) -> #ret_type {
-                sqlx::query!(#sql, self.#id_ident).execute(conn).await?;
-
+                sqlx::query!(#sql, #(#ident_keys),*).execute(conn).await?;
                 Ok(())
             }
         }
     } else {
         quote!()
+    };
+
+    let context_variant = if let Some(context_type) = &entity.context_type {
+        quote! {
+            #vis async fn delete_with_context(
+                self,
+                conn: &mut sqlx::PgConnection,
+                context: Option<&#context_type>,
+            ) -> #ret_type {
+                #before_delete
+
+                #after_delete
+
+                Ok(())
+            }
+        }
+    } else {
+        quote! {}
+    };
+
+    let context = if entity.context_type.is_none() {
+        if entity.before_delete.is_some() || entity.after_delete.is_some() {
+            quote! { let context = None::<()>; }
+        } else {
+            quote! {}
+        }
+    } else {
+        quote! { let context = None::<_>; }
     };
 
     quote! {
@@ -79,12 +120,16 @@ fn delete_self(entity: &Entity) -> TokenStream {
             self,
             conn: &mut sqlx::PgConnection,
         ) -> #ret_type {
+            #context
+
             #before_delete
 
             #after_delete
 
             Ok(())
         }
+
+        #context_variant
 
         #no_trigger_variant
     }
@@ -111,7 +156,7 @@ fn delete_by(entity: &Entity, val: &EntityField, fn_name: &Ident) -> TokenStream
         ) -> #ret_type {
             use sqlx::Done;
 
-            let result = sqlx::query!(#sql, by).execute(conn).await?;
+            let result = sqlx::query!(#sql, val).execute(conn).await?;
 
             Ok(result.rows_affected())
         }

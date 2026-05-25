@@ -1,3 +1,6 @@
+use crate::transform::{
+    build_select_clause, process_transform, transform_bind_expressions, TransformBinding,
+};
 use crate::{attrs::ConvertType, Entity, EntityField};
 use itertools::Itertools;
 use proc_macro2::TokenStream;
@@ -46,15 +49,19 @@ fn insert_fn(entity: &Entity) -> TokenStream {
         .collect::<Vec<_>>();
 
     let vis = &entity.vis;
-
     let entity_ident = &entity.ident;
-    let insert_sql = insert_sql(entity);
+    let (insert_sql, set_bindings, get_bindings) = match insert_sql(entity) {
+        Ok(parts) => parts,
+        Err(err) => return err.to_compile_error(),
+    };
+    let set_param_binds = transform_bind_expressions(&set_bindings);
+    let get_param_binds = transform_bind_expressions(&get_bindings);
 
     let has_trigger = entity.before_insert.is_some() || entity.after_insert.is_some();
 
     let before_insert = if let Some(before_fn) = &entity.before_insert {
         quote!(
-            #before_fn(&self, &mut *conn).await?;
+            #before_fn(&self, context, &mut *conn).await?;
         )
     } else {
         quote!()
@@ -62,18 +69,28 @@ fn insert_fn(entity: &Entity) -> TokenStream {
 
     let after_insert = if let Some(after_fn) = &entity.after_insert {
         quote!(
-            let rec = sqlx::query_as!(#entity_ident, #insert_sql, #(#query_idents),*)
-                .fetch_one(&mut *conn)
-                .await?;
-
-            #after_fn(&rec, conn).await?;
+            let rec = sqlx::query_as!(
+                #entity_ident,
+                #insert_sql,
+                #(#query_idents),*
+                #(, #set_param_binds)*
+                #(, #get_param_binds)*
+            )
+            .fetch_one(&mut *conn)
+            .await?;
+            #after_fn(&rec, context, conn).await?;
         )
     } else {
         quote!(
-            let rec = sqlx::query_as!(#entity_ident, #insert_sql, #(#query_idents),*)
-                .fetch_one(conn)
-                .await?;
-
+            let rec = sqlx::query_as!(
+                #entity_ident,
+                #insert_sql,
+                #(#query_idents),*
+                #(, #set_param_binds)*
+                #(, #get_param_binds)*
+            )
+            .fetch_one(conn)
+            .await?;
         )
     };
 
@@ -92,15 +109,46 @@ fn insert_fn(entity: &Entity) -> TokenStream {
                 self,
                 conn: &mut sqlx::PgConnection,
             ) -> #ret_type {
-                let rec = sqlx::query_as!(#entity_ident, #insert_sql, #(#query_idents),*)
-                    .fetch_one(conn)
-                    .await?;
-
+                let rec = sqlx::query_as!(
+                    #entity_ident,
+                    #insert_sql,
+                    #(#query_idents),*
+                    #(, #set_param_binds)*
+                    #(, #get_param_binds)*
+                )
+                .fetch_one(conn)
+                .await?;
                 Ok(rec)
             }
         }
     } else {
         quote!()
+    };
+
+    let context_variant = if let Some(context_type) = &entity.context_type {
+        quote! {
+            #vis async fn insert_with_context(
+                self,
+                conn: &mut sqlx::PgConnection,
+                context: Option<&#context_type>,
+            ) -> #ret_type {
+                #before_insert
+                #after_insert
+                Ok(rec)
+            }
+        }
+    } else {
+        quote! {}
+    };
+
+    let context = if entity.context_type.is_none() {
+        if entity.before_insert.is_some() || entity.after_insert.is_some() {
+            quote! { let context = None::<()>; }
+        } else {
+            quote! {}
+        }
+    } else {
+        quote! { let context = None::<_>; }
     };
 
     quote! {
@@ -109,33 +157,54 @@ fn insert_fn(entity: &Entity) -> TokenStream {
             self,
             conn: &mut sqlx::PgConnection,
         ) -> #ret_type {
+            #context
             #before_insert
-
             #after_insert
-
             Ok(rec)
         }
+
+        #context_variant
 
         #no_trigger_variant
     }
 }
 
-fn insert_sql(entity: &Entity) -> String {
-    let columns = entity
-        .fields
-        .iter()
-        .map(EntityField::fmt_for_select)
-        .join(", ");
-
+fn insert_sql(
+    entity: &Entity,
+) -> syn::Result<(String, Vec<TransformBinding>, Vec<TransformBinding>)> {
     let insertable = entity.insertable_fields().collect::<Vec<_>>();
-    format!(
+    let mut param_offset = insertable.len();
+    let mut set_bindings = Vec::new();
+    let mut values = Vec::with_capacity(insertable.len());
+
+    for (index, field) in insertable.iter().enumerate() {
+        let value_placeholder = format!("${}", index + 1);
+        if let Some(transform_set) = &field.transform_set {
+            let (expr, count) = process_transform(transform_set, &value_placeholder, param_offset)?;
+            param_offset += count;
+            if let Some(params_fn) = &field.transform_set_params {
+                set_bindings.push(TransformBinding {
+                    params_fn: params_fn.clone(),
+                    count,
+                });
+            }
+            values.push(expr);
+        } else {
+            values.push(value_placeholder);
+        }
+    }
+
+    let (columns, get_bindings, _) = build_select_clause(&entity.fields, param_offset)?;
+    let sql = format!(
         "INSERT INTO {} ({}) VALUES ({}) RETURNING {}",
         entity.table_name,
         insertable
             .iter()
             .map(|field| field.column_name.replace("r#", ""))
             .join(", "),
-        (1..=insertable.len()).map(|i| format!("${}", i)).join(", "),
+        values.join(", "),
         columns
-    )
+    );
+
+    Ok((sql, set_bindings, get_bindings))
 }

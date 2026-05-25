@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE composite SET non_key = $3 WHERE name = $1 AND other = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ea2e608084eabb7a793b5e1e7f0322057bb80dbba3e5dae5a5018246df69ae37"
+}

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM mostly_keys WHERE value = $1 AND  field = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "314f2a665b70f45c24f270500822d76527b2fb28c42ce30f20b55ed96d02366d"
+}

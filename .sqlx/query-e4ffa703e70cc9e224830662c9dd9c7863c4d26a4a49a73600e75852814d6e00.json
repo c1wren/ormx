@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO all_keys (value, field) VALUES ($1, $2) RETURNING value, field AS \"field: _\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "value",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "all_keys",
+            "name": "value"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "field: _",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "all_keys",
+            "name": "field"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "e4ffa703e70cc9e224830662c9dd9c7863c4d26a4a49a73600e75852814d6e00"
+}

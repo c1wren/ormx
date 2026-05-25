@@ -1,5 +1,7 @@
+use crate::transform::{process_transform, transform_bind_expressions, TransformBinding};
 use crate::{attrs::ConvertType, Entity, EntityField};
 use proc_macro2::Ident;
+use proc_macro2::Span;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 
@@ -12,15 +14,28 @@ pub fn setters(entity: &Entity) -> TokenStream2 {
 }
 
 fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
-    let query = format!(
-        "UPDATE {} SET {} = $1 WHERE {} = $2",
-        entity.table_name, field.column_name, entity.id.column_name
+    let fn_name_no_trigger = Ident::new(&format!("no_trigger_{}", fn_name), Span::call_site());
+    let primary_keys: Vec<&EntityField> = entity.fields.iter().filter(|x| x.is_key).collect();
+    let (set_expr, transform_bindings) = match build_set_expr(field) {
+        Ok(parts) => parts,
+        Err(err) => return err.to_compile_error(),
+    };
+
+    let mut query = format!(
+        "UPDATE {} SET {} = {} WHERE",
+        entity.table_name, field.column_name, set_expr
     );
+    for (index, key) in primary_keys.iter().enumerate() {
+        query.push_str(format!(" {} = ${}", key.column_name, index + 2).as_str());
+        if index + 1 != primary_keys.len() {
+            query.push_str(" AND ")
+        }
+    }
 
     let field_ty = &field.ty;
     let field_ident = &field.ident;
-    let pkey = &entity.id.ident;
     let vis = &entity.vis;
+    let transform_binds = transform_bind_expressions(&transform_bindings);
 
     let value_converter = match &field.convert {
         Some(ConvertType::As(t)) => quote! { value as #t },
@@ -34,17 +49,135 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
         quote!(Result<(), sqlx::Error>)
     };
 
+    let ident_keys: Vec<_> = primary_keys
+        .iter()
+        .map(|k| {
+            let ident = &k.ident;
+            if k.custom_type {
+                quote!(self.#ident as _)
+            } else {
+                quote!(self.#ident)
+            }
+        })
+        .collect();
+
+    let before_update = if let Some(before_fn) = &entity.before_update {
+        quote!(
+            #before_fn(self, context, &mut *conn).await?;
+        )
+    } else {
+        quote!()
+    };
+
+    let has_trigger = entity.after_update.is_some() || entity.before_update.is_some();
+
+    let after_update = if let Some(after_fn) = &entity.after_update {
+        quote!(
+            let previous = self.clone();
+
+            sqlx::query!(#query, #value_converter, #(#ident_keys),* #(, #transform_binds)*)
+                .execute(&mut *conn)
+                .await?;
+            self.#field_ident = value;
+
+            #after_fn(self, previous, context, conn).await?;
+        )
+    } else {
+        quote!(
+            sqlx::query!(#query, #value_converter, #(#ident_keys),* #(, #transform_binds)*)
+                .execute(conn)
+                .await?;
+            self.#field_ident = value;
+        )
+    };
+
+    let no_trigger_variant = if has_trigger {
+        quote! {
+            /// Updates the row in the database specified by the primary key.
+            ///
+            /// This will update every field except the primary key field. `Patch` should be used if only updating some of the fields.
+            ///
+            /// Does not call the before and after triggers.
+            #vis async fn #fn_name_no_trigger(
+                &mut self,
+                conn: &mut sqlx::PgConnection,
+                value: #field_ty
+            ) -> #ret_type {
+                sqlx::query!(#query, #value_converter, #(#ident_keys),* #(, #transform_binds)*)
+                    .execute(conn)
+                    .await?;
+                self.#field_ident = value;
+
+                Ok(())
+            }
+        }
+    } else {
+        quote!()
+    };
+
+    let context_variant = if let Some(context_type) = &entity.context_type {
+        let fn_name_with_context =
+            Ident::new(&format!("{}_with_context", fn_name), Span::call_site());
+
+        quote! {
+            #vis async fn #fn_name_with_context(
+                &mut self,
+                conn: &mut sqlx::PgConnection,
+                value: #field_ty,
+                context: Option<&#context_type>
+            ) -> #ret_type {
+                #before_update
+                #after_update
+                Ok(())
+            }
+        }
+    } else {
+        quote! {}
+    };
+
+    let context = if entity.context_type.is_none() {
+        if entity.before_update.is_some() || entity.after_update.is_some() {
+            quote! { let context = None::<()>; }
+        } else {
+            quote! {}
+        }
+    } else {
+        quote! { let context = None::<_>; }
+    };
+
     quote! {
         #vis async fn #fn_name(
             &mut self,
             conn: &mut sqlx::PgConnection,
             value: #field_ty
         ) -> #ret_type {
-            sqlx::query!(#query, #value_converter, &self.#pkey)
-                .execute(conn)
-                .await?;
-            self.#field_ident = value;
+            #context
+            #before_update
+            #after_update
             Ok(())
         }
+
+        #context_variant
+
+        #no_trigger_variant
+    }
+}
+
+fn build_set_expr(field: &EntityField) -> syn::Result<(String, Vec<TransformBinding>)> {
+    if let Some(transform_set) = &field.transform_set {
+        let (expr, count) = process_transform(transform_set, "$1", 1)?;
+        let bindings = field
+            .transform_set_params
+            .as_ref()
+            .map(|params_fn| {
+                vec![TransformBinding {
+                    params_fn: params_fn.clone(),
+                    count,
+                }]
+            })
+            .unwrap_or_default();
+        Ok((expr, bindings))
+    } else {
+        Ok(("$1".to_string(), Vec::new()))
     }
 }
