@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE transform_records SET value = concat($3::text, $1::text, $4::text) WHERE id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int4",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e0f117d367a11bc222696f7d729a499861bd3dec4719e7997aa14a64c955702d"
+}

@@ -1,4 +1,5 @@
 use crate::attrs::{ConvertType, EntityAttr, FieldAttr};
+use crate::get::{GetterKind, LockMode, LockingGetter};
 use crate::transform::count_transform_params;
 use proc_macro2::Span;
 use std::convert::TryFrom;
@@ -10,6 +11,7 @@ pub struct EntityField {
     pub get_one: Option<Ident>,
     pub get_optional: Option<Ident>,
     pub get_many: Option<Ident>,
+    pub locking_getters: Vec<LockingGetter>,
     pub set: Option<Ident>,
     pub delete: Option<Ident>,
     pub convert: Option<ConvertType>,
@@ -61,6 +63,7 @@ pub struct Entity {
     pub vis: Visibility,
 
     pub get_all: Option<Ident>,
+    pub locking_getters: Vec<LockingGetter>,
     pub delete: Option<Ident>,
 
     pub update: Ident,
@@ -106,6 +109,7 @@ impl TryFrom<&Field> for EntityField {
             get_one: None,
             get_optional: None,
             get_many: None,
+            locking_getters: Vec::new(),
             delete: None,
             set: None,
             convert: None,
@@ -138,6 +142,20 @@ impl TryFrom<&Field> for EntityField {
                 FieldAttr::GetMany(g) => {
                     let fn_name = g.unwrap_or_else(|| get_ident("get_by"));
                     result.get_many = Some(fn_name);
+                }
+                FieldAttr::LockingGet(kind, mode, name, span) => {
+                    let default_name = format!(
+                        "get_by_{}_for_{}",
+                        ident.to_string().trim_start_matches("r#"),
+                        mode.suffix()
+                    );
+                    add_locking_getter(
+                        &mut result.locking_getters,
+                        kind,
+                        mode,
+                        name.unwrap_or_else(|| Ident::new(&default_name, span)),
+                        span,
+                    )?;
                 }
                 FieldAttr::Delete(g) => {
                     let fn_name = g.unwrap_or_else(|| get_ident("delete_by"));
@@ -231,6 +249,7 @@ impl TryFrom<DeriveInput> for Entity {
         let mut insert = None;
         let mut patch = None;
         let mut get_all = None;
+        let mut locking_getters = Vec::new();
         let mut delete = None;
         let mut before_patch = None;
         let mut after_patch = None;
@@ -268,6 +287,16 @@ impl TryFrom<DeriveInput> for Entity {
                         fn_name.unwrap_or_else(|| Ident::new("get_all", Span::call_site()));
                     get_all.replace(fn_name).map_or(Ok(()), duplicate)?
                 }
+                EntityAttr::LockingGetAll(mode, name, span) => {
+                    let default_name = format!("get_all_for_{}", mode.suffix());
+                    add_locking_getter(
+                        &mut locking_getters,
+                        GetterKind::All,
+                        mode,
+                        name.unwrap_or_else(|| Ident::new(&default_name, span)),
+                        span,
+                    )?;
+                }
                 EntityAttr::Deletable(fn_name) => {
                     let fn_name =
                         fn_name.unwrap_or_else(|| Ident::new("delete", Span::call_site()));
@@ -296,13 +325,7 @@ impl TryFrom<DeriveInput> for Entity {
             .map(EntityField::try_from)
             .collect::<Result<Vec<_>>>()?;
 
-        let table_keys: Vec<EntityField> = fields
-            .iter()
-            .filter(|field| field.is_key)
-            .cloned()
-            .collect();
-
-        if table_keys.is_empty() {
+        if !fields.iter().any(|field| field.is_key) {
             panic!("struct does not have a primary key or composite key")
         }
 
@@ -315,6 +338,7 @@ impl TryFrom<DeriveInput> for Entity {
             insert,
             patch,
             get_all,
+            locking_getters,
             delete,
             before_patch,
             after_patch,
@@ -328,6 +352,30 @@ impl TryFrom<DeriveInput> for Entity {
             context_type,
         })
     }
+}
+
+fn add_locking_getter(
+    getters: &mut Vec<LockingGetter>,
+    kind: GetterKind,
+    mode: LockMode,
+    name: Ident,
+    span: Span,
+) -> Result<()> {
+    if getters
+        .iter()
+        .any(|getter| getter.kind == kind && getter.mode == mode)
+    {
+        return Err(Error::new(
+            span,
+            format!(
+                "duplicate ormx attribute `{}_for_{}`",
+                kind.prefix(),
+                mode.suffix()
+            ),
+        ));
+    }
+    getters.push(LockingGetter { kind, mode, name });
+    Ok(())
 }
 
 fn get_fields(span: Span, input: &DataStruct) -> Result<Vec<&Field>> {

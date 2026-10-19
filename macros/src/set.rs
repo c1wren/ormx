@@ -1,7 +1,6 @@
-use crate::transform::{process_transform, transform_bind_expressions, TransformBinding};
+use crate::methods::{self, MethodNames};
+use crate::transform::{bind_transform_params, process_transform, TransformBinding};
 use crate::{attrs::ConvertType, Entity, EntityField};
-use proc_macro2::Ident;
-use proc_macro2::Span;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 
@@ -9,14 +8,14 @@ pub fn setters(entity: &Entity) -> TokenStream2 {
     entity
         .fields
         .iter()
-        .flat_map(|field| field.set.as_ref().map(|name| setter(entity, field, name)))
+        .flat_map(|field| methods::setter(entity, field).map(|names| setter(entity, field, &names)))
         .collect()
 }
 
-fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2 {
-    let fn_name_no_trigger = Ident::new(&format!("no_trigger_{}", fn_name), Span::call_site());
+fn setter(entity: &Entity, field: &EntityField, method_names: &MethodNames) -> TokenStream2 {
+    let fn_name = &method_names.main;
     let primary_keys: Vec<&EntityField> = entity.fields.iter().filter(|x| x.is_key).collect();
-    let (set_expr, transform_bindings) = match build_set_expr(field) {
+    let (set_expr, transform_bindings) = match build_set_expr(field, primary_keys.len()) {
         Ok(parts) => parts,
         Err(err) => return err.to_compile_error(),
     };
@@ -35,7 +34,8 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
     let field_ty = &field.ty;
     let field_ident = &field.ident;
     let vis = &entity.vis;
-    let transform_binds = transform_bind_expressions(&transform_bindings);
+    let transform_params = bind_transform_params(&transform_bindings);
+    let transform_binds = &transform_params.expressions;
 
     let value_converter = match &field.convert {
         Some(ConvertType::As(t)) => quote! { value as #t },
@@ -61,6 +61,12 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
         })
         .collect();
 
+    let update_query = transform_params.wrap(quote! {
+        sqlx::query!(#query, #value_converter, #(#ident_keys),* #(, #transform_binds)*)
+            .execute(&mut *conn)
+            .await
+    });
+
     let before_update = if let Some(before_fn) = &entity.before_update {
         quote!(
             #before_fn(self, context, &mut *conn).await?;
@@ -69,29 +75,23 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
         quote!()
     };
 
-    let has_trigger = entity.after_update.is_some() || entity.before_update.is_some();
-
     let after_update = if let Some(after_fn) = &entity.after_update {
         quote!(
             let previous = self.clone();
 
-            sqlx::query!(#query, #value_converter, #(#ident_keys),* #(, #transform_binds)*)
-                .execute(&mut *conn)
-                .await?;
+            #update_query?;
             self.#field_ident = value;
 
             #after_fn(self, previous, context, conn).await?;
         )
     } else {
         quote!(
-            sqlx::query!(#query, #value_converter, #(#ident_keys),* #(, #transform_binds)*)
-                .execute(conn)
-                .await?;
+            #update_query?;
             self.#field_ident = value;
         )
     };
 
-    let no_trigger_variant = if has_trigger {
+    let no_trigger_variant = if let Some(fn_name_no_trigger) = &method_names.no_trigger {
         quote! {
             /// Updates the row in the database specified by the primary key.
             ///
@@ -103,9 +103,7 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
                 conn: &mut sqlx::PgConnection,
                 value: #field_ty
             ) -> #ret_type {
-                sqlx::query!(#query, #value_converter, #(#ident_keys),* #(, #transform_binds)*)
-                    .execute(conn)
-                    .await?;
+                #update_query?;
                 self.#field_ident = value;
 
                 Ok(())
@@ -115,10 +113,9 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
         quote!()
     };
 
-    let context_variant = if let Some(context_type) = &entity.context_type {
-        let fn_name_with_context =
-            Ident::new(&format!("{}_with_context", fn_name), Span::call_site());
-
+    let context_variant = if let (Some(context_type), Some(fn_name_with_context)) =
+        (&entity.context_type, &method_names.with_context)
+    {
         quote! {
             #vis async fn #fn_name_with_context(
                 &mut self,
@@ -163,9 +160,12 @@ fn setter(entity: &Entity, field: &EntityField, fn_name: &Ident) -> TokenStream2
     }
 }
 
-fn build_set_expr(field: &EntityField) -> syn::Result<(String, Vec<TransformBinding>)> {
+fn build_set_expr(
+    field: &EntityField,
+    key_count: usize,
+) -> syn::Result<(String, Vec<TransformBinding>)> {
     if let Some(transform_set) = &field.transform_set {
-        let (expr, count) = process_transform(transform_set, "$1", 1)?;
+        let (expr, count) = process_transform(transform_set, "$1", 1 + key_count)?;
         let bindings = field
             .transform_set_params
             .as_ref()
@@ -179,5 +179,31 @@ fn build_set_expr(field: &EntityField) -> syn::Result<(String, Vec<TransformBind
         Ok((expr, bindings))
     } else {
         Ok(("$1".to_string(), Vec::new()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn setter_transform_parameters_follow_all_composite_key_parameters() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[ormx(table = "records")]
+            struct Record {
+                #[ormx(key)] id: i32,
+                #[ormx(key)] version: i32,
+                #[ormx(
+                    transform_set = "concat($param1::text, $field::text, $param2::text)",
+                    transform_set_params = "params"
+                )]
+                value: String,
+            }
+        };
+        let entity = Entity::try_from(input).unwrap();
+        let (sql, bindings) = build_set_expr(&entity.fields[2], 2).unwrap();
+        assert_eq!(sql, "concat($4::text, $1::text, $5::text)");
+        assert_eq!(bindings.len(), 1);
+        assert_eq!(bindings[0].count, 2);
     }
 }

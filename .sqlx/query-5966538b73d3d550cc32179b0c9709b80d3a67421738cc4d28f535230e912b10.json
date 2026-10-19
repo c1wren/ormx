@@ -1,0 +1,39 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO transform_records (value) VALUES (concat($2::text, $1::text, $3::text)) RETURNING id, replace(value, $4::text, $5::text) AS \"value!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "transform_records",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "value!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "5966538b73d3d550cc32179b0c9709b80d3a67421738cc4d28f535230e912b10"
+}

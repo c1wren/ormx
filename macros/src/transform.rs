@@ -1,5 +1,5 @@
 use crate::EntityField;
-use proc_macro2::{Literal, TokenStream};
+use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::quote;
 use syn::{Error, ExprPath, Result};
 
@@ -57,17 +57,42 @@ pub fn process_transform(
     Ok((sql, max_param))
 }
 
-pub fn transform_bind_expressions(bindings: &[TransformBinding]) -> Vec<TokenStream> {
-    bindings
-        .iter()
-        .flat_map(|binding| {
-            let params_fn = &binding.params_fn;
-            (0..binding.count).map(move |i| {
-                let index = syn::Index::from(i);
-                quote! { #params_fn().#index }
-            })
-        })
-        .collect()
+/// Cached parameter tuples and their bind expressions for one SQL statement.
+pub struct TransformParams {
+    pub expressions: Vec<TokenStream>,
+    setup: TokenStream,
+}
+
+impl TransformParams {
+    /// Keep parameter tuples alive through query execution, without leaking their local names.
+    pub fn wrap(&self, query: TokenStream) -> TokenStream {
+        let setup = &self.setup;
+        quote! {{
+            #setup
+            #query
+        }}
+    }
+}
+
+pub fn bind_transform_params(bindings: &[TransformBinding]) -> TransformParams {
+    let mut expressions = Vec::new();
+    let mut setup = TokenStream::new();
+    for (binding_index, binding) in bindings.iter().enumerate() {
+        if binding.count == 0 {
+            continue;
+        }
+        let params_fn = &binding.params_fn;
+        let params = Ident::new(
+            &format!("__ormx_transform_params_{binding_index}"),
+            Span::mixed_site(),
+        );
+        setup.extend(quote!(let #params = #params_fn();));
+        expressions.extend((0..binding.count).map(|i| {
+            let index = syn::Index::from(i);
+            quote!(#params.#index)
+        }));
+    }
+    TransformParams { expressions, setup }
 }
 
 pub fn build_select_clause(

@@ -1,5 +1,6 @@
+use crate::methods::MethodNames;
 use crate::transform::{
-    build_select_clause, count_transform_params, runtime_transform_expr, transform_bind_expressions,
+    bind_transform_params, build_select_clause, count_transform_params, runtime_transform_expr,
 };
 use crate::{attrs::ConvertType, Entity, EntityField};
 use proc_macro2::{Span, TokenStream};
@@ -7,9 +8,10 @@ use quote::quote;
 use syn::Ident;
 
 pub fn patch(entity: &Entity) -> TokenStream {
-    let patch_struct_ident = match &entity.patch {
-        Some(ident) => ident,
-        None => return quote!(),
+    let (Some(patch_struct_ident), Some(method_names)) =
+        (&entity.patch, crate::methods::patch(entity))
+    else {
+        return quote!();
     };
 
     if entity.patchable_fields().count() == 0 {
@@ -17,7 +19,7 @@ pub fn patch(entity: &Entity) -> TokenStream {
     }
 
     let patch_struct = patch_struct(entity, patch_struct_ident);
-    let methods = methods(entity, patch_struct_ident);
+    let methods = methods(entity, patch_struct_ident, &method_names);
 
     quote! {
         #patch_struct
@@ -63,7 +65,8 @@ fn patch_struct(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
     }
 }
 
-fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
+fn methods(entity: &Entity, patch_struct_ident: &Ident, method_names: &MethodNames) -> TokenStream {
+    let fn_name = &method_names.main;
     let patchable_fields = entity
         .patchable_fields()
         .map(|field| &field.ident)
@@ -146,7 +149,8 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
             Ok(parts) => parts,
             Err(err) => return err.to_compile_error(),
         };
-    let before_patch_transform_binds = transform_bind_expressions(&before_patch_bindings);
+    let before_patch_params = bind_transform_params(&before_patch_bindings);
+    let before_patch_transform_binds = &before_patch_params.expressions;
 
     let mut patch_sql_statement = String::from("UPDATE {} SET {} WHERE");
     let mut before_patch_sql = format!("SELECT {} FROM {} WHERE", columns, entity.table_name);
@@ -159,8 +163,6 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
             patch_sql_statement.push_str(" AND ");
         }
     }
-
-    let has_trigger = entity.before_patch.is_some() || entity.after_patch.is_some();
 
     let before_patch = if let Some(before_fn) = &entity.before_patch {
         quote!(
@@ -194,16 +196,20 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         })
         .collect();
 
+    let previous_query = before_patch_params.wrap(quote! {
+        sqlx::query_as!(
+            Self,
+            #before_patch_sql,
+            #(#ident_keys),*
+            #(, #before_patch_transform_binds)*
+        )
+        .fetch_one(&mut *conn)
+        .await
+    });
+
     let after_patch = if let Some(after_fn) = &entity.after_patch {
         quote!(
-            let previous = sqlx::query_as!(
-                Self,
-                #before_patch_sql,
-                #(#ident_keys),*
-                #(, #before_patch_transform_binds)*
-            )
-            .fetch_one(&mut *conn)
-            .await?;
+            let previous = #previous_query?;
 
             #patch_struct_ident::patch(&patch, &mut *conn, #( #items ),*).await?;
 
@@ -229,12 +235,12 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         quote!(Result<(), sqlx::Error>)
     };
 
-    let no_trigger_variant = if has_trigger {
+    let no_trigger_variant = if let Some(fn_name_no_trigger) = &method_names.no_trigger {
         quote! {
             /// Updates the row as specified by the entity's primary key with only the fields that are included in the patch.
             ///
             /// Does not call the before and after triggers.
-            #vis async fn no_trigger_patch(
+            #vis async fn #fn_name_no_trigger(
                 &mut self,
                 conn: &mut sqlx::PgConnection,
                 patch: #patch_struct_ident,
@@ -252,10 +258,12 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
         quote!()
     };
 
-    let context_variant = if let Some(context_type) = &entity.context_type {
+    let context_variant = if let (Some(context_type), Some(fn_name_with_context)) =
+        (&entity.context_type, &method_names.with_context)
+    {
         quote! {
             /// Updates the row as specified by the entity's keys with only the fields that are included in the patch.
-            #vis async fn patch_with_context(
+            #vis async fn #fn_name_with_context(
                 &mut self,
                 conn: &mut sqlx::PgConnection,
                 patch: #patch_struct_ident,
@@ -312,7 +320,7 @@ fn methods(entity: &Entity, patch_struct_ident: &Ident) -> TokenStream {
 
         impl #entity_ident {
             /// Updates the row as specified by the entity's keys with only the fields that are included in the patch.
-            #vis async fn patch(
+            #vis async fn #fn_name(
                 &mut self,
                 conn: &mut sqlx::PgConnection,
                 patch: #patch_struct_ident,

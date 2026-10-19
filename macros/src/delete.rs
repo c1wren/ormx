@@ -1,9 +1,10 @@
+use crate::methods::{self, MethodNames};
 use crate::{Entity, EntityField};
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 
 pub fn delete(entity: &Entity) -> TokenStream {
-    let delete = entity.delete.as_ref().map(|_| delete_self(entity));
+    let delete = methods::delete(entity).map(|names| delete_self(entity, &names));
 
     let delete_by = entity
         .fields
@@ -22,7 +23,7 @@ pub fn delete(entity: &Entity) -> TokenStream {
     }
 }
 
-fn delete_self(entity: &Entity) -> TokenStream {
+fn delete_self(entity: &Entity, method_names: &MethodNames) -> TokenStream {
     let vis = &entity.vis;
     let mut sql = format!("DELETE FROM {} WHERE", entity.table_name);
     let keys: Vec<&EntityField> = entity.fields.iter().filter(|x| x.is_key).collect();
@@ -33,7 +34,7 @@ fn delete_self(entity: &Entity) -> TokenStream {
         }
     }
 
-    let has_trigger = entity.before_delete.is_some() || entity.after_delete.is_some();
+    let fn_name = &method_names.main;
 
     let before_delete = if let Some(before_fn) = &entity.before_delete {
         quote!(
@@ -72,9 +73,9 @@ fn delete_self(entity: &Entity) -> TokenStream {
         quote!(Result<(), sqlx::Error>)
     };
 
-    let no_trigger_variant = if has_trigger {
+    let no_trigger_variant = if let Some(fn_name_no_trigger) = &method_names.no_trigger {
         quote! {
-            #vis async fn no_trigger_delete(
+            #vis async fn #fn_name_no_trigger(
                 self,
                 conn: &mut sqlx::PgConnection,
             ) -> #ret_type {
@@ -86,9 +87,11 @@ fn delete_self(entity: &Entity) -> TokenStream {
         quote!()
     };
 
-    let context_variant = if let Some(context_type) = &entity.context_type {
+    let context_variant = if let (Some(context_type), Some(fn_name_with_context)) =
+        (&entity.context_type, &method_names.with_context)
+    {
         quote! {
-            #vis async fn delete_with_context(
+            #vis async fn #fn_name_with_context(
                 self,
                 conn: &mut sqlx::PgConnection,
                 context: Option<&#context_type>,
@@ -116,7 +119,7 @@ fn delete_self(entity: &Entity) -> TokenStream {
 
     quote! {
         /// Deletes the entity with the specified primary key from the database.
-        #vis async fn delete(
+        #vis async fn #fn_name(
             self,
             conn: &mut sqlx::PgConnection,
         ) -> #ret_type {

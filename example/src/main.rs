@@ -10,7 +10,8 @@ async fn main() -> Result<()> {
     env_logger::init();
 
     // setup connection pool
-    let database_url = "postgres://postgres@127.0.0.1/ormx".to_string();
+    let database_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://postgres@127.0.0.1/ormx".to_string());
     let db_pool = PgPoolOptions::new()
         .max_connections(5)
         .connect(&database_url)
@@ -39,6 +40,7 @@ async fn main() -> Result<()> {
     }
     .insert(&mut *db_pool.acquire().await?)
     .await?;
+    let club_id = club.id;
     dbg!(&club);
 
     // test patching
@@ -47,6 +49,32 @@ async fn main() -> Result<()> {
         .set_encrypted("new hello".to_string());
     club.patch(&mut *db_pool.acquire().await?, patch).await?;
     dbg!(club);
+
+    // FOR UPDATE: keep the row locked while reading and updating it in one transaction.
+    let mut tx = db_pool.begin().await?;
+    let mut club = Club::by_id_for_update(&mut tx, &club_id).await?;
+    club.name = "Updated under a row lock".into();
+    club.my_update(&mut tx).await?;
+    tx.commit().await?;
+
+    // FOR SHARE: return an optional model and hold its shared lock until commit.
+    let mut tx = db_pool.begin().await?;
+    let club = Club::by_id_for_share(&mut tx, &club_id).await?;
+    dbg!(club);
+    tx.commit().await?;
+
+    // FOR NO KEY UPDATE: lock matching rows in key order, using the enum conversion.
+    let mut tx = db_pool.begin().await?;
+    let clubs = Club::by_enum_for_no_key_update(&mut tx, &TestEnum::Test2).await?;
+    assert!(clubs.iter().any(|club| club.id == club_id));
+    dbg!(clubs);
+    tx.rollback().await?;
+
+    // FOR KEY SHARE: lock all rows in key order with the default generated method name.
+    let mut tx = db_pool.begin().await?;
+    let clubs = Club::get_all_for_key_share(&mut tx).await?;
+    dbg!(clubs);
+    tx.commit().await?;
 
     // test get_optional
     let club = Club::by_name(&mut *db_pool.acquire().await?, &TestEnum::Test1).await?;
@@ -101,6 +129,7 @@ pub enum TestEnum {
     patchable,
     deletable,
     get_all = "find_all_clubs",
+    get_all_for_key_share,
     context_type = "i32",
     error_type = "TestError",
     before_patch = "Club::before_patch",
@@ -113,12 +142,22 @@ pub enum TestEnum {
     after_delete = "Club::after_delete"
 )]
 struct Club {
-    #[ormx(key, default, get_optional = "by_id")]
+    #[ormx(
+        key,
+        default,
+        get_optional = "by_id",
+        get_one_for_update = "by_id_for_update",
+        get_optional_for_share = "by_id_for_share"
+    )]
     id: i32,
     name: String,
     #[ormx(rename = "test1")]
     test_rename: String,
-    #[ormx(get_optional = "by_name", set = "update_enum")]
+    #[ormx(
+        get_optional = "by_name",
+        get_many_for_no_key_update = "by_enum_for_no_key_update",
+        set = "update_enum"
+    )]
     // use a custom type that is really an i32
     // custom_type forces type inference by sqlx to eliminate errors
     #[ormx(custom_type, convert_as = "i32")]

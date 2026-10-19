@@ -1,0 +1,18 @@
+error[E0308]: mismatched types
+ --> tests/ui/connection.rs:9:28
+  |
+9 |     let _ = Record::locked(conn, &1).await;
+  |             -------------- ^^^^ expected `&mut Transaction<'_, Postgres>`, found `&mut PgConnection`
+  |             |
+  |             arguments to this function are incorrect
+  |
+  = note: expected mutable reference `&mut Transaction<'_, Postgres>`
+             found mutable reference `&mut PgConnection`
+note: associated function defined here
+ --> tests/ui/connection.rs:4:60
+  |
+1 | #[derive(ormx::Entity)]
+  |          ------------
+...
+4 |     #[ormx(key, rename = "record_id", get_one_for_update = "locked")]
+  |                                                            ^^^^^^^^

@@ -1,5 +1,5 @@
 use crate::transform::{
-    build_select_clause, process_transform, transform_bind_expressions, TransformBinding,
+    bind_transform_params, build_select_clause, process_transform, TransformBinding,
 };
 use crate::{attrs::ConvertType, Entity, EntityField};
 use itertools::Itertools;
@@ -54,8 +54,22 @@ fn insert_fn(entity: &Entity) -> TokenStream {
         Ok(parts) => parts,
         Err(err) => return err.to_compile_error(),
     };
-    let set_param_binds = transform_bind_expressions(&set_bindings);
-    let get_param_binds = transform_bind_expressions(&get_bindings);
+    let bindings = set_bindings
+        .into_iter()
+        .chain(get_bindings)
+        .collect::<Vec<_>>();
+    let transform_params = bind_transform_params(&bindings);
+    let param_binds = &transform_params.expressions;
+    let insert_query = transform_params.wrap(quote! {
+        sqlx::query_as!(
+            #entity_ident,
+            #insert_sql,
+            #(#query_idents),*
+            #(, #param_binds)*
+        )
+        .fetch_one(&mut *conn)
+        .await
+    });
 
     let has_trigger = entity.before_insert.is_some() || entity.after_insert.is_some();
 
@@ -69,28 +83,12 @@ fn insert_fn(entity: &Entity) -> TokenStream {
 
     let after_insert = if let Some(after_fn) = &entity.after_insert {
         quote!(
-            let rec = sqlx::query_as!(
-                #entity_ident,
-                #insert_sql,
-                #(#query_idents),*
-                #(, #set_param_binds)*
-                #(, #get_param_binds)*
-            )
-            .fetch_one(&mut *conn)
-            .await?;
+            let rec = #insert_query?;
             #after_fn(&rec, context, conn).await?;
         )
     } else {
         quote!(
-            let rec = sqlx::query_as!(
-                #entity_ident,
-                #insert_sql,
-                #(#query_idents),*
-                #(, #set_param_binds)*
-                #(, #get_param_binds)*
-            )
-            .fetch_one(conn)
-            .await?;
+            let rec = #insert_query?;
         )
     };
 
@@ -109,15 +107,7 @@ fn insert_fn(entity: &Entity) -> TokenStream {
                 self,
                 conn: &mut sqlx::PgConnection,
             ) -> #ret_type {
-                let rec = sqlx::query_as!(
-                    #entity_ident,
-                    #insert_sql,
-                    #(#query_idents),*
-                    #(, #set_param_binds)*
-                    #(, #get_param_binds)*
-                )
-                .fetch_one(conn)
-                .await?;
+                let rec = #insert_query?;
                 Ok(rec)
             }
         }

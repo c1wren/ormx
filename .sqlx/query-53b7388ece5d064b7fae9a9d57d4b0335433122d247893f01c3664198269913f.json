@@ -1,0 +1,84 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT record_id AS id, position, group_id, concat(label, $2::text) AS \"label!\", kind AS \"kind: _\", tag FROM locking_records WHERE record_id = $1 FOR KEY SHARE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "locking_records",
+            "name": "record_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "position",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "locking_records",
+            "name": "position"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "group_id",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "locking_records",
+            "name": "group_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "label!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "kind: _",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "locking_records",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "tag",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "locking_records",
+            "name": "tag"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null,
+      false,
+      false
+    ]
+  },
+  "hash": "53b7388ece5d064b7fae9a9d57d4b0335433122d247893f01c3664198269913f"
+}

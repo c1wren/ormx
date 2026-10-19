@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT record_id FROM locking_records WHERE record_id = $1 AND position = $2 FOR UPDATE NOWAIT",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "record_id",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "locking_records",
+            "name": "record_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3578273b08bd251967995e5481d9fed70327681ce28a28acbd072e307f71c521"
+}

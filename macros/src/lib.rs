@@ -13,6 +13,7 @@ mod entity;
 mod get;
 
 mod insert;
+mod methods;
 mod patch;
 mod set;
 mod transform;
@@ -22,7 +23,7 @@ fn derive_entity(input: DeriveInput) -> Result<TokenStream2> {
     let ty = input.ident.clone();
     let entity = Entity::try_from(input)?;
 
-    let getters = get::getters(&entity);
+    let getters = get::getters(&entity)?;
     let setters = set::setters(&entity);
     let insert = insert::insert(&entity);
     let patch = patch::patch(&entity);

@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT $1::integer = ANY(pg_blocking_pids($2)) AS \"blocked!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "blocked!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "a7ed50fd47aaab3427d4fd129381f586e8dd34e1830afac5b760b784af76d509"
+}

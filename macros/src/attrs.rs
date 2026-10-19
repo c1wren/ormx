@@ -1,3 +1,4 @@
+use crate::get::{parse_locking_getter, GetterKind, LockMode};
 use proc_macro2::{Group, Ident, Span, TokenStream, TokenTree};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
@@ -9,6 +10,7 @@ pub enum EntityAttr {
     Insertable(Option<Ident>),
     Patchable(Option<Ident>),
     GetAll(Option<Ident>),
+    LockingGetAll(LockMode, Option<Ident>, Span),
     Deletable(Option<Ident>),
     BeforePatch(ExprPath),
     AfterPatch(ExprPath),
@@ -27,6 +29,9 @@ impl Parse for EntityAttr {
         use EntityAttr::*;
 
         let ident = input.parse::<Ident>()?;
+        if let Some((GetterKind::All, mode)) = parse_locking_getter(&ident) {
+            return Ok(LockingGetAll(mode, opt_assign_ident(&input)?, ident.span()));
+        }
         let attr = match &*ident.to_string() {
             "table" => Table(assign_string(ident.span(), &input)?),
             "update" => Update(opt_assign_ident(&input)?),
@@ -60,6 +65,7 @@ pub enum FieldAttr {
     GetOne(Option<Ident>),
     GetOptional(Option<Ident>),
     GetMany(Option<Ident>),
+    LockingGet(GetterKind, LockMode, Option<Ident>, Span),
     Delete(Option<Ident>),
     Set(Option<Ident>),
     Updatable(bool),
@@ -85,6 +91,16 @@ impl Parse for FieldAttr {
         use FieldAttr::*;
 
         let ident = input.parse::<Ident>()?;
+        if let Some((kind, mode)) = parse_locking_getter(&ident) {
+            if kind != GetterKind::All {
+                return Ok(LockingGet(
+                    kind,
+                    mode,
+                    opt_assign_ident(&input)?,
+                    ident.span(),
+                ));
+            }
+        }
         let attr = match &*ident.to_string() {
             "rename" => Rename(assign_string(ident.span(), &input)?),
             "set" => Set(opt_assign_ident(&input)?),

@@ -1,15 +1,15 @@
 use crate::transform::{
-    build_select_clause, process_transform, transform_bind_expressions, TransformBinding,
+    bind_transform_params, build_select_clause, process_transform, TransformBinding,
 };
 use crate::{attrs::ConvertType, entity::EntityField, Entity};
-use proc_macro2::{Ident, Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::quote;
 
 pub fn update(entity: &Entity) -> TokenStream {
-    let updatable_fields = entity.updatable_fields().collect::<Vec<_>>();
-    if updatable_fields.is_empty() {
+    let Some(method_names) = crate::methods::update(entity) else {
         return quote! {};
-    }
+    };
+    let updatable_fields = entity.updatable_fields().collect::<Vec<_>>();
 
     let primary_keys: Vec<&EntityField> = entity.fields.iter().filter(|x| x.is_key).collect();
     let (set_clause, transform_bindings) =
@@ -86,42 +86,42 @@ pub fn update(entity: &Entity) -> TokenStream {
         })
         .collect();
 
-    let transform_binds = transform_bind_expressions(&transform_bindings);
-    let select_transform_binds = transform_bind_expressions(&select_bindings);
-    let has_trigger = entity.after_update.is_some() || entity.before_update.is_some();
+    let transform_params = bind_transform_params(&transform_bindings);
+    let transform_binds = &transform_params.expressions;
+    let update_query = transform_params.wrap(quote! {
+        sqlx::query!(
+            #sql,
+            #(#ident_keys),*,
+            #(#updatable_field_values),*
+            #(, #transform_binds)*
+        )
+        .execute(&mut *conn)
+        .await
+    });
+    let select_params = bind_transform_params(&select_bindings);
+    let select_transform_binds = &select_params.expressions;
+    let previous_query = select_params.wrap(quote! {
+        sqlx::query_as!(
+            Self,
+            #before_value_sql,
+            #(#ident_keys),*
+            #(, #select_transform_binds)*
+        )
+        .fetch_one(&mut *conn)
+        .await
+    });
 
     let after_update = if let Some(after_fn) = &entity.after_update {
         quote!(
-            let previous = sqlx::query_as!(
-                Self,
-                #before_value_sql,
-                #(#ident_keys),*
-                #(, #select_transform_binds)*
-            )
-            .fetch_one(&mut *conn)
-            .await?;
+            let previous = #previous_query?;
 
-            sqlx::query!(
-                #sql,
-                #(#ident_keys),*,
-                #(#updatable_field_values),*
-                #(, #transform_binds)*
-            )
-            .execute(&mut *conn)
-            .await?;
+            #update_query?;
 
             #after_fn(self, previous, context, conn).await?;
         )
     } else {
         quote!(
-            sqlx::query!(
-                #sql,
-                #(#ident_keys),*,
-                #(#updatable_field_values),*
-                #(, #transform_binds)*
-            )
-            .execute(conn)
-            .await?;
+            #update_query?;
         )
     };
 
@@ -131,25 +131,18 @@ pub fn update(entity: &Entity) -> TokenStream {
         quote!(Result<(), sqlx::Error>)
     };
 
-    let no_trigger_variant = if has_trigger {
+    let no_trigger_variant = if let Some(fn_name_no_trigger) = &method_names.no_trigger {
         quote! {
             /// Updates the row in the database specified by the primary key.
             ///
             /// This will update every field except the primary key field. `Patch` should be used if only updating some of the fields.
             ///
             /// Does not call the before and after triggers.
-            #vis async fn no_trigger_update(
+            #vis async fn #fn_name_no_trigger(
                 &self,
                 conn: &mut sqlx::PgConnection
             ) -> #ret_type {
-                sqlx::query!(
-                    #sql,
-                    #(#ident_keys),*,
-                    #(#updatable_field_values),*
-                    #(, #transform_binds)*
-                )
-                .execute(conn)
-                .await?;
+                #update_query?;
                 Ok(())
             }
         }
@@ -157,12 +150,11 @@ pub fn update(entity: &Entity) -> TokenStream {
         quote!()
     };
 
-    let fn_name = &entity.update;
+    let fn_name = &method_names.main;
 
-    let context_variant = if let Some(context_type) = &entity.context_type {
-        let fn_name_with_context =
-            Ident::new(&format!("{}_with_context", fn_name), Span::call_site());
-
+    let context_variant = if let (Some(context_type), Some(fn_name_with_context)) =
+        (&entity.context_type, &method_names.with_context)
+    {
         quote! {
             /// Updates the row in the database specified by the keys
             ///

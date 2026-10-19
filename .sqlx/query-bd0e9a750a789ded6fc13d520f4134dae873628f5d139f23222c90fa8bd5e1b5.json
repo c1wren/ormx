@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE locking_records SET label = 'changed' WHERE record_id = 2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "bd0e9a750a789ded6fc13d520f4134dae873628f5d139f23222c90fa8bd5e1b5"
+}
